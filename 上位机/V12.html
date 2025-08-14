@@ -1,0 +1,2995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D键鼠配置程序</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: radial-gradient(ellipse at center, #0a0a0a 0%, #000000 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #00ffff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(0, 128, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(255, 0, 128, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 10s ease-in-out infinite alternate;
+            z-index: -1;
+        }
+
+        @keyframes backgroundShift {
+            0% { transform: scale(1) rotate(0deg); }
+            100% { transform: scale(1.1) rotate(5deg); }
+        }
+
+        .container {
+            background: linear-gradient(145deg, rgba(15, 15, 30, 0.9), rgba(25, 25, 50, 0.8));
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 25px;
+            padding: 40px;
+            box-shadow: 
+                0 0 50px rgba(0, 255, 255, 0.3),
+                inset 0 0 50px rgba(0, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            max-width: 1200px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+            animation: containerGlow 4s ease-in-out infinite alternate;
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+
+        @keyframes containerGlow {
+            0% { box-shadow: 0 0 50px rgba(0, 255, 255, 0.3), inset 0 0 50px rgba(0, 255, 255, 0.1); }
+            100% { box-shadow: 0 0 80px rgba(0, 255, 255, 0.5), inset 0 0 50px rgba(0, 255, 255, 0.2); }
+        }
+
+        .title {
+            font-size: 36px;
+            font-weight: 900;
+            color: #00ffff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+            animation: titlePulse 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes titlePulse {
+            0% { text-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
+            100% { text-shadow: 0 0 40px rgba(0, 255, 255, 1), 0 0 60px rgba(0, 255, 255, 0.6); }
+        }
+
+        .subtitle {
+            color: rgba(0, 255, 255, 0.7);
+            margin-bottom: 30px;
+            font-size: 16px;
+            letter-spacing: 2px;
+        }
+
+        .connection-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .connection-method {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-radius: 15px;
+            background: linear-gradient(45deg, rgba(0, 255, 255, 0.1), rgba(0, 128, 255, 0.1));
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 200px;
+        }
+
+        .connection-method:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+
+        .connection-method.active {
+            background: linear-gradient(45deg, rgba(0, 255, 255, 0.3), rgba(0, 128, 255, 0.3));
+            border-color: #00ffff;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+            background: #ff4757;
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 20px currentColor;
+        }
+
+        .status-dot.connected {
+            background: #00ff80;
+        }
+
+        .connect-btn {
+            background: linear-gradient(45deg, #ff6000, #ffaa00);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .connect-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255, 102, 0, 0.6);
+        }
+
+        /* 主界面 */
+        .main-interface {
+            display: block;
+            perspective: 1200px;
+            margin: 40px 0;
+        }
+
+        .device-replica {
+            width: 850px;
+            height: 470px;
+            margin: 0 auto;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateX(12deg) rotateY(-2deg);
+            animation: deviceFloat 8s ease-in-out infinite;
+        }
+
+        @keyframes deviceFloat {
+            0%, 100% { transform: rotateX(12deg) rotateY(-2deg) translateY(0px); }
+            50% { transform: rotateX(12deg) rotateY(-2deg) translateY(-8px); }
+        }
+
+        .device-base {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #f0f0f0, #e8e8e8, #ddd);
+            position: relative;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.3),
+                inset 0 0 30px rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            overflow: visible;
+            border-radius: 15px;
+        }
+
+        .device-base::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: inherit;
+            border-radius: 15px;
+            z-index: 1;
+        }
+
+        .device-base::after {
+            content: '';
+            position: absolute;
+            right: -20px;
+            top: 25%;
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(145deg, #f0f0f0, #e8e8e8, #ddd);
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            border-radius: 15px;
+            box-shadow: 
+                0 15px 30px rgba(0, 0, 0, 0.2),
+                inset 0 0 20px rgba(255, 255, 255, 0.2);
+            z-index: 2;
+        }
+
+        /* 优化的键盘区域样式 */
+        .keyboard-zone {
+            position: absolute;
+            left: 50px;
+            top: 60px;
+            width: 550px;
+            height: 350px;
+            background: linear-gradient(145deg, rgba(0, 255, 255, 0.08), rgba(0, 150, 255, 0.15));
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            box-shadow: 0 10px 30px rgba(0, 255, 255, 0.2);
+            overflow: hidden;
+            position: relative;
+            z-index: 3;
+            /* 确保良好的点击体验 */
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 优化的鼠标区域容器 */
+        .mouse-knob-container {
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 180px;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 6;
+            /* 确保点击区域准确 */
+            border-radius: 50%;
+        }
+
+        /* 优化的鼠标旋钮样式 */
+        .mouse-knob {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, 
+                rgba(255, 0, 150, 0.9), 
+                rgba(255, 80, 0, 0.7),
+                rgba(200, 0, 100, 0.8)
+            );
+            border: 4px solid rgba(255, 0, 128, 0.8);
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+            box-shadow: 
+                0 0 30px rgba(255, 0, 128, 0.6),
+                inset 0 0 20px rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            /* 确保良好的点击体验 */
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mouse-knob::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 80%;
+            height: 80%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .mouse-knob::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            width: 4px;
+            height: 25px;
+            background: linear-gradient(45deg, #fff, #ffff00);
+            border-radius: 2px;
+            transform: translateX(-50%);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* 悬停效果 */
+        .keyboard-zone:hover {
+            transform: translateY(-8px) scale(1.03);
+            box-shadow: 0 25px 60px rgba(0, 255, 255, 0.6);
+            border-color: #00ffff;
+        }
+
+        .mouse-knob:hover {
+            transform: scale(1.1) rotateZ(10deg);
+            box-shadow: 
+                0 0 50px rgba(255, 0, 128, 0.8),
+                inset 0 0 30px rgba(255, 255, 255, 0.3);
+            border-color: #ff0080;
+        }
+
+        /* 点击反馈效果 */
+        .keyboard-zone:active {
+            transform: translateY(-4px) scale(1.01);
+            transition: all 0.1s ease;
+        }
+
+        .mouse-knob:active {
+            transform: scale(0.95);
+            box-shadow: 
+                0 0 20px rgba(255, 0, 128, 0.6),
+                inset 0 0 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.1s ease;
+        }
+
+        .zone-label {
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+            z-index: 2;
+            position: relative;
+            pointer-events: none;
+        }
+
+        .keyboard-zone::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: left 0.6s;
+            pointer-events: none;
+        }
+
+        .keyboard-zone:hover::before {
+            left: 100%;
+        }
+
+        /* 键盘配置界面 */
+        .keyboard-config {
+            display: none;
+            animation: slideInUp 0.6s ease;
+        }
+
+        .mouse-config {
+            display: none;
+            animation: slideInUp 0.6s ease;
+        }
+
+        @keyframes slideInUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .back-btn {
+            background: linear-gradient(45deg, #666, #888);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-bottom: 25px;
+            transition: all 0.3s ease;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .back-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 存档管理区域 */
+        .preset-manager {
+            background: linear-gradient(145deg, rgba(0, 150, 255, 0.1), rgba(0, 100, 200, 0.1));
+            border: 2px solid rgba(0, 150, 255, 0.3);
+            border-radius: 20px;
+            padding: 25px;
+            margin: 30px 0;
+            box-shadow: 0 0 30px rgba(0, 150, 255, 0.2);
+        }
+
+        .preset-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            background: linear-gradient(45deg, #0080ff, #0060cc);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 5px 15px rgba(0, 128, 255, 0.3);
+        }
+
+        .preset-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 128, 255, 0.5);
+        }
+
+        .preset-btn.save {
+            background: linear-gradient(45deg, #00cc66, #009944);
+        }
+
+        .preset-btn.save:hover {
+            box-shadow: 0 10px 25px rgba(0, 204, 102, 0.5);
+        }
+
+        .preset-btn.clear {
+            background: linear-gradient(45deg, #ff6600, #cc4400);
+        }
+
+        .preset-btn.clear:hover {
+            box-shadow: 0 10px 25px rgba(255, 102, 0, 0.5);
+        }
+
+        .preset-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .preset-item {
+            background: linear-gradient(145deg, rgba(30, 30, 60, 0.8), rgba(50, 50, 100, 0.6));
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .preset-item:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+            transform: translateY(-3px);
+        }
+
+        .preset-item.active {
+            border-color: #00ff80;
+            background: linear-gradient(145deg, rgba(0, 255, 128, 0.2), rgba(0, 200, 100, 0.15));
+            box-shadow: 0 0 25px rgba(0, 255, 128, 0.4);
+        }
+
+        .preset-name {
+            font-weight: bold;
+            font-size: 16px;
+            color: #00ffff;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+
+        .preset-info {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: left;
+            line-height: 1.4;
+        }
+
+        .preset-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        .preset-action-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .preset-action-btn:hover {
+            border-color: #00ffff;
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        .preset-action-btn.delete {
+            border-color: rgba(255, 100, 100, 0.5);
+            color: #ff6464;
+        }
+
+        .preset-action-btn.delete:hover {
+            border-color: #ff6464;
+            background: rgba(255, 100, 100, 0.1);
+        }
+
+        /* 模态框样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+        }
+
+        .modal {
+            background: linear-gradient(145deg, rgba(20, 20, 40, 0.95), rgba(40, 40, 80, 0.9));
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal h3 {
+            color: #00ffff;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 20px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 15px;
+            background: rgba(10, 10, 30, 0.8);
+            color: #00ffff;
+            font-family: 'Orbitron', monospace;
+            font-size: 16px;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        .modal-input:focus {
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn.confirm {
+            background: linear-gradient(45deg, #00cc66, #009944);
+            color: white;
+        }
+
+        .modal-btn.cancel {
+            background: linear-gradient(45deg, #666, #888);
+            color: white;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 高还原度键盘布局容器 */
+        .ultra-realistic-keyboard {
+            max-width: 700px;
+            margin: 30px auto;
+            perspective: 1000px;
+            padding: 30px;
+            background: linear-gradient(145deg, rgba(20, 20, 40, 0.8), rgba(40, 40, 80, 0.6));
+            border-radius: 25px;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
+        }
+
+        .key-row {
+            display: flex;
+            margin-bottom: 15px;
+            position: relative;
+            justify-content: flex-start;
+        }
+
+        .row-1, .row-2, .row-3, .row-4, .row-5 {
+            gap: 8px;
+        }
+
+        .row-5 {
+            justify-content: flex-start;
+            margin-bottom: 0px;
+            margin-top: -70px;
+        }
+
+        .realistic-key {
+            height: 55px;
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            border-radius: 12px;
+            background: linear-gradient(145deg, 
+                rgba(30, 30, 60, 0.9), 
+                rgba(50, 50, 100, 0.7),
+                rgba(20, 20, 40, 0.8)
+            );
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #00ffff;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            transform-style: preserve-3d;
+            box-shadow: 
+                0 6px 12px rgba(0, 0, 0, 0.3),
+                inset 0 2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .realistic-key.standard {
+            width: 55px;
+        }
+
+        .realistic-key.large-right {
+            width: 120px;
+        }
+
+        .realistic-key.large-vertical {
+            width: 55px;
+            height: 125px;
+        }
+
+        .realistic-key.large-left {
+            width: 85px;
+        }
+
+        .realistic-key.large-center {
+            width: 118px;
+        }
+
+        .realistic-key.large-k23 {
+            width: 118px;
+        }
+
+        .realistic-key:hover {
+            border-color: #00ffff;
+            transform: translateY(-3px) rotateX(8deg);
+            box-shadow: 
+                0 12px 20px rgba(0, 255, 255, 0.4),
+                inset 0 2px 6px rgba(255, 255, 255, 0.2);
+        }
+
+        .realistic-key.selected {
+            border-color: #00ffff;
+            background: linear-gradient(145deg, 
+                rgba(0, 255, 255, 0.4), 
+                rgba(0, 150, 255, 0.5)
+            );
+            color: white;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.8),
+                inset 0 2px 6px rgba(255, 255, 255, 0.3);
+            animation: selectedPulse 1.5s ease-in-out infinite alternate;
+            transform: translateY(-3px) rotateX(8deg);
+        }
+
+        @keyframes selectedPulse {
+            from { box-shadow: 0 0 30px rgba(0, 255, 255, 0.8), inset 0 2px 6px rgba(255, 255, 255, 0.3); }
+            to { box-shadow: 0 0 45px rgba(0, 255, 255, 1), inset 0 2px 8px rgba(255, 255, 255, 0.4); }
+        }
+
+        .realistic-key.programmed {
+            background: linear-gradient(145deg, 
+                rgba(0, 255, 128, 0.3), 
+                rgba(0, 200, 100, 0.4)
+            );
+            color: white;
+            border-color: #00ff80;
+            box-shadow: 
+                0 6px 15px rgba(0, 255, 128, 0.4),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        /* 鼠标配置界面 */
+        .mouse-3d-display {
+            width: 280px;
+            height: 280px;
+            margin: 30px auto;
+            border-radius: 50%;
+            background: radial-gradient(
+                circle at 35% 35%, 
+                rgba(255, 255, 255, 0.4), 
+                rgba(255, 0, 128, 0.3), 
+                rgba(128, 0, 255, 0.5),
+                rgba(0, 128, 255, 0.4)
+            );
+            border: 4px solid rgba(255, 0, 128, 0.8);
+            box-shadow: 
+                0 0 60px rgba(255, 0, 128, 0.6),
+                inset 0 0 40px rgba(255, 255, 255, 0.2);
+            position: relative;
+            animation: mouseRotation 12s linear infinite;
+            overflow: hidden;
+        }
+
+        @keyframes mouseRotation {
+            from { transform: rotateY(0deg) rotateX(10deg); }
+            to { transform: rotateY(360deg) rotateX(10deg); }
+        }
+
+        .mouse-3d-display::before {
+            content: '';
+            position: absolute;
+            top: 15%;
+            left: 15%;
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.7), transparent 60%);
+            animation: mouseBreath 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes mouseBreath {
+            from { transform: scale(0.7); opacity: 0.6; }
+            to { transform: scale(1.1); opacity: 0.3; }
+        }
+
+        .sensitivity-controls {
+            margin: 40px 0;
+            padding: 30px;
+            background: linear-gradient(145deg, rgba(255, 0, 128, 0.1), rgba(255, 64, 0, 0.1));
+            border-radius: 25px;
+            border: 2px solid rgba(255, 0, 128, 0.3);
+            box-shadow: 0 0 35px rgba(255, 0, 128, 0.2);
+        }
+
+        .sensitivity-input {
+            width: 250px;
+            padding: 20px;
+            border: 2px solid rgba(255, 0, 128, 0.6);
+            border-radius: 25px;
+            font-size: 22px;
+            text-align: center;
+            margin: 0 20px;
+            background: rgba(20, 20, 40, 0.9);
+            color: #ff0080;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            box-shadow: 
+                inset 0 0 25px rgba(255, 0, 128, 0.2),
+                0 0 25px rgba(255, 0, 128, 0.3);
+        }
+
+        .sensitivity-input:focus {
+            outline: none;
+            border-color: #ff0080;
+            box-shadow: 
+                inset 0 0 30px rgba(255, 0, 128, 0.3),
+                0 0 50px rgba(255, 0, 128, 0.6);
+        }
+
+        .apply-btn {
+            background: linear-gradient(45deg, #ff0080, #ff4000);
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-left: 20px;
+            font-family: 'Orbitron', monospace;
+            box-shadow: 0 10px 30px rgba(255, 0, 128, 0.4);
+        }
+
+        .apply-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 18px 40px rgba(255, 0, 128, 0.6);
+        }
+
+        .instruction {
+            background: linear-gradient(145deg, rgba(255, 193, 7, 0.1), rgba(255, 152, 0, 0.1));
+            border: 2px solid rgba(255, 193, 7, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            margin: 30px 0;
+            color: rgba(255, 193, 7, 0.95);
+            font-size: 16px;
+            box-shadow: 0 0 30px rgba(255, 193, 7, 0.2);
+            font-weight: 500;
+        }
+
+        .key-display {
+            margin-top: 40px;
+            font-size: 18px;
+            color: #00ffff;
+            padding: 30px;
+            background: linear-gradient(145deg, rgba(0, 255, 255, 0.1), rgba(0, 128, 255, 0.1));
+            border-radius: 20px;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+        }
+
+        /* 团队LOGO样式 */
+        .team-logo {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background: linear-gradient(145deg, rgba(0, 255, 255, 0.2), rgba(0, 150, 255, 0.15));
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 5px 15px rgba(0, 255, 255, 0.2);
+        }
+
+        .team-logo:hover {
+            border-color: #00ffff;
+            box-shadow: 0 8px 25px rgba(0, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .logo-icon {
+            font-size: 20px;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        }
+
+        .logo-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+            font-family: 'Orbitron', monospace;
+        }
+
+        /* 欢迎界面样式 */
+        .welcome-screen {
+            display: block;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .welcome-content {
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .brand-showcase {
+            position: relative;
+        }
+
+        .main-logo {
+            margin-bottom: 60px;
+            animation: logoEntrance 1.5s ease-out;
+        }
+
+        @keyframes logoEntrance {
+            0% { 
+                transform: scale(0.5) translateY(50px); 
+                opacity: 0; 
+            }
+            70% { 
+                transform: scale(1.1) translateY(-10px); 
+                opacity: 0.8; 
+            }
+            100% { 
+                transform: scale(1) translateY(0); 
+                opacity: 1; 
+            }
+        }
+
+        .logo-circle {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto 30px;
+            position: relative;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, 
+                rgba(0, 255, 255, 0.3), 
+                rgba(0, 150, 255, 0.2), 
+                rgba(0, 100, 200, 0.3)
+            );
+            border: 4px solid rgba(0, 255, 255, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: logoSpin 20s linear infinite;
+            box-shadow: 
+                0 0 60px rgba(0, 255, 255, 0.4),
+                inset 0 0 40px rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes logoSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .logo-inner {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, 
+                rgba(0, 255, 255, 0.8), 
+                rgba(0, 150, 255, 0.6)
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.6),
+                inset 0 0 20px rgba(255, 255, 255, 0.2);
+            animation: logoInnerPulse 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes logoInnerPulse {
+            0% { 
+                box-shadow: 
+                    0 0 30px rgba(0, 255, 255, 0.6),
+                    inset 0 0 20px rgba(255, 255, 255, 0.2);
+            }
+            100% { 
+                box-shadow: 
+                    0 0 50px rgba(0, 255, 255, 1),
+                    inset 0 0 30px rgba(255, 255, 255, 0.4);
+            }
+        }
+
+        .logo-symbol {
+            font-size: 48px;
+            color: white;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            animation: symbolFloat 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes symbolFloat {
+            0% { transform: translateY(0px) scale(1); }
+            100% { transform: translateY(-5px) scale(1.1); }
+        }
+
+        .brand-name {
+            font-size: 48px;
+            font-weight: 900;
+            color: #00ffff;
+            margin-bottom: 15px;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
+            font-family: 'Orbitron', monospace;
+            letter-spacing: 3px;
+            animation: nameGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes nameGlow {
+            0% { text-shadow: 0 0 30px rgba(0, 255, 255, 0.8); }
+            100% { text-shadow: 0 0 50px rgba(0, 255, 255, 1), 0 0 70px rgba(0, 255, 255, 0.6); }
+        }
+
+        .brand-tagline {
+            font-size: 18px;
+            color: rgba(0, 255, 255, 0.8);
+            margin-bottom: 40px;
+            letter-spacing: 1px;
+            font-style: italic;
+        }
+
+        .product-intro {
+            margin-bottom: 50px;
+            animation: contentSlideUp 1s ease-out 0.5s both;
+        }
+
+        @keyframes contentSlideUp {
+            from { 
+                transform: translateY(30px); 
+                opacity: 0; 
+            }
+            to { 
+                transform: translateY(0); 
+                opacity: 1; 
+            }
+        }
+
+        .product-title {
+            font-size: 32px;
+            color: #00ffff;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .product-desc {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 40px;
+        }
+
+        .feature-highlights {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 50px;
+            flex-wrap: wrap;
+        }
+
+        .feature-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(145deg, rgba(0, 255, 255, 0.1), rgba(0, 150, 255, 0.1));
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 20px;
+            min-width: 150px;
+            transition: all 0.3s ease;
+            animation: featureFloat 3s ease-in-out infinite;
+        }
+
+        .feature-item:nth-child(1) { animation-delay: 0s; }
+        .feature-item:nth-child(2) { animation-delay: 0.5s; }
+        .feature-item:nth-child(3) { animation-delay: 1s; }
+
+        @keyframes featureFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .feature-item:hover {
+            border-color: #00ffff;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.4);
+            transform: translateY(-5px) scale(1.05);
+        }
+
+        .feature-icon {
+            font-size: 36px;
+            margin-bottom: 15px;
+        }
+
+        .feature-text {
+            color: #00ffff;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .start-config-btn {
+            background: linear-gradient(45deg, #00ff80, #00cc66, #00aa55);
+            color: white;
+            border: none;
+            padding: 20px 50px;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            font-family: 'Orbitron', monospace;
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 
+                0 10px 30px rgba(0, 255, 128, 0.4),
+                inset 0 2px 10px rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+            animation: btnPulse 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes btnPulse {
+            0% { 
+                box-shadow: 
+                    0 10px 30px rgba(0, 255, 128, 0.4),
+                    inset 0 2px 10px rgba(255, 255, 255, 0.2);
+            }
+            100% { 
+                box-shadow: 
+                    0 15px 40px rgba(0, 255, 128, 0.6),
+                    inset 0 2px 15px rgba(255, 255, 255, 0.3);
+            }
+        }
+
+        .start-config-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.6s;
+        }
+
+        .start-config-btn:hover::before {
+            left: 100%;
+        }
+
+        .start-config-btn:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 
+                0 20px 50px rgba(0, 255, 128, 0.6),
+                inset 0 2px 15px rgba(255, 255, 255, 0.3);
+        }
+
+        .start-config-btn:active {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .btn-text {
+            position: relative;
+            z-index: 2;
+        }
+
+        .btn-arrow {
+            font-size: 28px;
+            transition: transform 0.3s ease;
+            position: relative;
+            z-index: 2;
+        }
+
+        .start-config-btn:hover .btn-arrow {
+            transform: translateX(5px);
+        }
+
+        .welcome-footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid rgba(0, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            animation: footerFadeIn 1s ease-out 1s both;
+        }
+
+        @keyframes footerFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 高级功能区样式 */
+        .advanced-functions-container {
+            margin: 30px 0;
+            padding: 30px;
+            background: linear-gradient(145deg, rgba(128, 0, 255, 0.1), rgba(255, 0, 128, 0.1));
+            border: 2px solid rgba(128, 0, 255, 0.4);
+            border-radius: 25px;
+            box-shadow: 0 0 40px rgba(128, 0, 255, 0.3);
+        }
+
+        .advanced-title {
+            color: #8000ff;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-shadow: 0 0 20px rgba(128, 0, 255, 0.8);
+        }
+
+        .advanced-hint {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 25px;
+            font-size: 16px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            border: 1px solid rgba(128, 0, 255, 0.3);
+        }
+
+        .advanced-functions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .advanced-category {
+            background: linear-gradient(145deg, rgba(0, 0, 0, 0.4), rgba(20, 20, 40, 0.6));
+            border-radius: 20px;
+            padding: 20px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .advanced-category.profile {
+            border-color: rgba(0, 150, 255, 0.5);
+            background: linear-gradient(145deg, rgba(0, 150, 255, 0.1), rgba(0, 100, 200, 0.1));
+        }
+
+        .advanced-category.calibrate {
+            border-color: rgba(128, 0, 255, 0.5);
+            background: linear-gradient(145deg, rgba(128, 0, 255, 0.1), rgba(200, 0, 255, 0.1));
+        }
+
+        .advanced-category.led {
+            border-color: rgba(255, 193, 7, 0.5);
+            background: linear-gradient(145deg, rgba(255, 193, 7, 0.1), rgba(255, 152, 0, 0.1));
+        }
+
+        .advanced-category-header {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ffff;
+        }
+
+        .advanced-function-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .advanced-function-btn {
+            background: linear-gradient(145deg, rgba(30, 30, 60, 0.8), rgba(50, 50, 100, 0.6));
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 12px 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            color: #fff;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            min-height: 80px;
+            justify-content: center;
+        }
+
+        .advanced-function-btn:hover {
+            border-color: #00ffff;
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 255, 255, 0.4);
+        }
+
+        .advanced-function-btn.profile:hover {
+            border-color: #0096ff;
+            box-shadow: 0 8px 20px rgba(0, 150, 255, 0.4);
+        }
+
+        .advanced-function-btn.calibrate:hover {
+            border-color: #8000ff;
+            box-shadow: 0 8px 20px rgba(128, 0, 255, 0.4);
+        }
+
+        .advanced-function-btn.led:hover {
+            border-color: #ffc107;
+            box-shadow: 0 8px 20px rgba(255, 193, 7, 0.4);
+        }
+
+        .advanced-function-icon {
+            font-size: 20px;
+        }
+
+        .advanced-function-name {
+            font-size: 10px;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .advanced-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .advanced-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .advanced-btn.cancel {
+            background: linear-gradient(45deg, #666, #888);
+            color: white;
+        }
+
+        .advanced-btn.clear {
+            background: linear-gradient(45deg, #ff6600, #cc4400);
+            color: white;
+        }
+
+        .advanced-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 按键扩展功能状态 */
+        .realistic-key.extended {
+            background: linear-gradient(145deg, 
+                rgba(128, 0, 255, 0.4), 
+                rgba(200, 0, 255, 0.5)
+            );
+            color: white;
+            border-color: #8000ff;
+            box-shadow: 
+                0 6px 15px rgba(128, 0, 255, 0.6),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        /* 高级功能选择模式样式 */
+        .advanced-mode-active .realistic-key.selected {
+            border-color: #8000ff;
+            background: linear-gradient(145deg, 
+                rgba(128, 0, 255, 0.6), 
+                rgba(200, 0, 255, 0.7)
+            );
+            animation: advancedSelectedPulse 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes advancedSelectedPulse {
+            from { box-shadow: 0 0 30px rgba(128, 0, 255, 0.8), inset 0 2px 6px rgba(255, 255, 255, 0.3); }
+            to { box-shadow: 0 0 45px rgba(128, 0, 255, 1), inset 0 2px 8px rgba(255, 255, 255, 0.4); }
+        }
+
+        /* 动画样式 */
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        @keyframes welcomeSlideOut {
+            0% { 
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+            100% { 
+                transform: scale(0.9) translateY(-20px);
+                opacity: 0;
+            }
+        }
+        @keyframes welcomeSlideIn {
+            0% { 
+                transform: scale(0.9) translateY(-20px);
+                opacity: 0;
+            }
+            100% { 
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+        }
+        @keyframes configSlideIn {
+            0% { 
+                transform: scale(0.95) translateY(20px);
+                opacity: 0;
+            }
+            100% { 
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .team-logo {
+                top: 15px;
+                left: 15px;
+                padding: 8px 12px;
+            }
+            
+            .logo-icon {
+                font-size: 16px;
+            }
+            
+            .logo-text {
+                font-size: 14px;
+            }
+            
+            .welcome-content {
+                padding: 20px;
+            }
+            
+            .logo-circle {
+                width: 120px;
+                height: 120px;
+            }
+            
+            .logo-inner {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .logo-symbol {
+                font-size: 32px;
+            }
+            
+            .brand-name {
+                font-size: 32px;
+                letter-spacing: 2px;
+            }
+            
+            .product-title {
+                font-size: 24px;
+            }
+            
+            .feature-highlights {
+                gap: 20px;
+            }
+            
+            .feature-item {
+                min-width: 120px;
+                padding: 15px;
+            }
+            
+            .start-config-btn {
+                padding: 15px 35px;
+                font-size: 18px;
+                gap: 10px;
+            }
+
+            .container {
+                padding: 20px;
+                width: 95%;
+            }
+            
+            .device-replica {
+                width: 100%;
+                height: 350px;
+                transform: rotateX(10deg);
+            }
+            
+            .keyboard-zone {
+                left: 30px;
+                width: 250px;
+                height: 180px;
+                font-size: 16px;
+            }
+            
+            .mouse-knob-container {
+                right: 10px;
+                width: 120px;
+                height: 120px;
+            }
+            
+            .mouse-knob {
+                width: 100px;
+                height: 100px;
+                font-size: 12px;
+            }
+            
+            .ultra-realistic-keyboard {
+                max-width: 400px;
+                padding: 15px;
+            }
+            
+            .realistic-key {
+                height: 40px;
+                font-size: 10px;
+            }
+            
+            .realistic-key.standard {
+                width: 40px;
+            }
+            
+            .realistic-key.large-right {
+                width: 90px;
+            }
+            
+            .realistic-key.large-left {
+                width: 65px;
+            }
+            
+            .realistic-key.large-center {
+                width: 100px;
+            }
+            
+            .preset-list {
+                grid-template-columns: 1fr;
+            }
+            
+            .preset-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 团队LOGO - 固定在左上角 -->
+        <div class="team-logo" id="teamLogo" onclick="showWelcomeScreen()">
+            <div class="logo-icon">⚡</div>
+            <div class="logo-text">三核智控</div>
+        </div>
+
+        <!-- 欢迎界面 -->
+        <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-content">
+                <div class="brand-showcase">
+                    <div class="main-logo">
+                        <div class="logo-circle">
+                            <div class="logo-inner">
+                                <span class="logo-symbol">⚡</span>
+                            </div>
+                        </div>
+                        <div class="brand-name">三核智控</div>
+                        <div class="brand-tagline">Triple Core Intelligence Control</div>
+                    </div>
+                    
+                    <div class="product-intro">
+                        <h2 class="product-title">3D键鼠配置中心</h2>
+                        <p class="product-desc">MPU9250九轴陀螺仪 + 自定义键盘矩阵</p>
+                        
+                        <div class="feature-highlights">
+                            <div class="feature-item">
+                                <div class="feature-icon">⌨️</div>
+                                <div class="feature-text">25键自定义矩阵</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">🖱️</div>
+                                <div class="feature-text">九轴陀螺仪控制</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">🔌</div>
+                                <div class="feature-text">USB/2.4GHz通信</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="start-config-btn" onclick="startConfiguration()">
+                        <span class="btn-text">开始配置</span>
+                        <span class="btn-arrow">→</span>
+                    </button>
+                </div>
+                
+                <div class="welcome-footer">
+                    <p>© 2025 三核智控团队 - 专业3D交互设备解决方案</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主配置界面 -->
+        <div class="main-config" id="mainConfig" style="display: none;">
+            <h1 class="title">3D键鼠配置中心</h1>
+            <p class="subtitle">MPU9250九轴陀螺仪 + 自定义键盘矩阵</p>
+            
+            <!-- USB连接 -->
+            <div class="connection-panel">
+                <div class="connection-method active" id="usbMethod">
+                    <div class="status-dot" id="usbStatus"></div>
+                    <span>🔌 USB串口连接</span>
+                    <button class="connect-btn" id="usbConnectBtn" onclick="toggleUSBConnection(event)">连接</button>
+                </div>
+            </div>
+
+            <!-- 主界面 -->
+            <div class="main-interface" id="mainInterface">
+                <div class="device-replica">
+                    <div class="device-base">
+                        <!-- 键盘区域 -->
+                        <div class="keyboard-zone" onclick="showKeyboardConfig()">
+                            <div class="zone-label">
+                                ⌨️ 键盘区<br>
+                                <small style="color: rgba(255,255,255,0.8);">25键自定义矩阵</small>
+                            </div>
+                        </div>
+                        
+                        <!-- 鼠标旋钮 -->
+                        <div class="mouse-knob-container">
+                            <div class="mouse-knob" onclick="showMouseConfig()">
+                                <div class="zone-label">
+                                    🖱️<br>
+                                    <small style="color: rgba(255,255,255,0.9);">九轴控制</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 键盘配置界面 -->
+        <div class="keyboard-config" id="keyboardConfig">
+            <button class="back-btn" onclick="showMainInterface()">← 返回主界面</button>
+            <h2>⌨️ 键盘矩阵配置</h2>
+            
+            <!-- 存档管理区域 -->
+            <div class="preset-manager">
+                <h3 style="color: #0080ff; margin-bottom: 20px;">📋 配置存档管理</h3>
+                
+                <div class="preset-controls">
+                    <button class="preset-btn save" onclick="showSavePresetModal()">💾 保存当前配置</button>
+                    <button class="preset-btn" onclick="loadDefaultPreset()">🔄 重置为默认</button>
+                    <button class="preset-btn clear" onclick="clearAllKeys()">🗑️ 清空所有按键</button>
+                </div>
+                
+                <div class="preset-list" id="presetList">
+                    <!-- 存档列表将在这里动态生成 -->
+                </div>
+            </div>
+            
+            <div class="instruction">
+                <strong>💡 操作说明：</strong><br>
+                • <strong>单击</strong> 按键进行普通键值映射（然后按下键盘上的任意键或组合键）<br>
+                • <strong>双击</strong> 按键进入高级功能设置模式<br>
+                支持所有标准按键：字母、数字、功能键、组合键等。总共25个自定义按键。<br>
+                <strong>🚀 高级功能：</strong> 双击按键可以设置旋转平移模式切换、陀螺仪校准、LED控制等扩展功能！
+            </div>
+            
+            <!-- 高级功能区 -->
+            <div class="advanced-functions-container" id="advancedFunctionsContainer" style="display: none;">
+                <h3 class="advanced-title">🚀 高级功能区</h3>
+                <div class="advanced-hint">
+                    当前选中: <span id="advancedSelectedKey">无</span> - 点击下方功能按键进行映射
+                </div>
+                
+                <div class="advanced-functions-grid" id="advancedFunctionsGrid">
+                    <!-- 高级功能按键将在这里动态生成 -->
+                </div>
+                
+                <div class="advanced-controls">
+                    <button class="advanced-btn cancel" onclick="cancelAdvancedMode()">取消选择</button>
+                    <button class="advanced-btn clear" onclick="clearAdvancedMapping()">清除高级功能</button>
+                </div>
+            </div>
+            
+            <!-- 高还原度键盘布局 -->
+            <div class="ultra-realistic-keyboard">
+                <!-- 第一行：5个标准键 + 1个右侧大键 -->
+                <div class="key-row row-1" id="keyboardRow1"></div>
+                
+                <!-- 第二行：6个标准键 -->
+                <div class="key-row row-2" id="keyboardRow2"></div>
+                
+                <!-- 第三行：5个标准键 -->
+                <div class="key-row row-3" id="keyboardRow3"></div>
+                
+                <!-- 第四行：1个左侧大键 + 4个标准键 -->
+                <div class="key-row row-4" id="keyboardRow4"></div>
+                
+                <!-- 第五行：1个标准键 + 1个中间大键 + 1个标准键 -->
+                <div class="key-row row-5" id="keyboardRow5"></div>
+            </div>
+            
+            <div class="key-display">
+                <div><strong>当前选中:</strong> <span id="selectedKey">无</span></div>
+                <div><strong>按键映射:</strong> <span id="keyMapping">请选择按键</span></div>
+                <div><strong>HID代码:</strong> <span id="hidCode">-</span></div>
+                <div><strong>扩展功能:</strong> <span id="extendedFunction">无</span></div>
+                <div style="margin-top: 15px; font-size: 15px; color: rgba(0,255,255,0.7);">
+                    <strong>提示:</strong> 单击选择普通映射，双击进入高级功能设置
+                </div>
+            </div>
+        </div>
+
+        <!-- 鼠标配置界面 -->
+        <div class="mouse-config" id="mouseConfig">
+            <button class="back-btn" onclick="showMainInterface()">← 返回主界面</button>
+            <h2>🖱️ 3D鼠标控制中心</h2>
+            <div class="instruction">
+                调整0-100之间的数值来控制MPU9250九轴陀螺仪的运动灵敏度。<br>
+                数值越高，鼠标移动越灵敏；数值越低，移动越平稳。
+            </div>
+            
+            <div class="mouse-3d-display"></div>
+            
+            <div class="sensitivity-controls">
+                <label style="color: #ff0080; font-weight: bold; font-size: 20px;">灵敏度设置:</label><br><br>
+                <input type="number" class="sensitivity-input" id="sensitivityInput" 
+                       min="0" max="100" value="50" placeholder="0-100">
+                <button class="apply-btn" onclick="applySensitivity()">应用设置</button>
+            </div>
+            
+            <div style="margin-top: 35px; color: #ff0080; font-size: 22px;">
+                <p>🎯 <strong>当前灵敏度:</strong> <span id="currentSensitivity" style="color: #00ffff; font-weight: bold;">50</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存配置模态框 -->
+    <div class="modal-overlay" id="savePresetModal">
+        <div class="modal">
+            <h3>💾 保存配置存档</h3>
+            <input type="text" class="modal-input" id="presetNameInput" placeholder="请输入配置名称...">
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" onclick="savePreset()">保存</button>
+                <button class="modal-btn cancel" onclick="closeSavePresetModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重命名配置模态框 -->
+    <div class="modal-overlay" id="renamePresetModal">
+        <div class="modal">
+            <h3>✏️ 重命名配置</h3>
+            <input type="text" class="modal-input" id="renamePresetInput" placeholder="请输入新的配置名称...">
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" onclick="confirmRenamePreset()">确认</button>
+                <button class="modal-btn cancel" onclick="closeRenamePresetModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== HID扫描码映射表 =====
+        const HID_KEYBOARD_CODES = {
+            'NONE': 0x00,
+            'A': 0x04, 'B': 0x05, 'C': 0x06, 'D': 0x07, 'E': 0x08, 'F': 0x09,
+            'G': 0x0A, 'H': 0x0B, 'I': 0x0C, 'J': 0x0D, 'K': 0x0E, 'L': 0x0F,
+            'M': 0x10, 'N': 0x11, 'O': 0x12, 'P': 0x13, 'Q': 0x14, 'R': 0x15,
+            'S': 0x16, 'T': 0x17, 'U': 0x18, 'V': 0x19, 'W': 0x1A, 'X': 0x1B,
+            'Y': 0x1C, 'Z': 0x1D,
+            '1': 0x1E, '2': 0x1F, '3': 0x20, '4': 0x21, '5': 0x22,
+            '6': 0x23, '7': 0x24, '8': 0x25, '9': 0x26, '0': 0x27,
+            'ENTER': 0x28, 'ESCAPE': 0x29, 'BACKSPACE': 0x2A, 'TAB': 0x2B,
+            'SPACE': 0x2C, 'DELETE': 0x4C, 'DOT': 0x37, 'KP_DOT': 0x63,
+            'F1': 0x3A, 'F2': 0x3B, 'F3': 0x3C, 'F4': 0x3D, 
+            'F5': 0x3E, 'F6': 0x3F, 'F7': 0x40, 'F8': 0x41,
+            'F9': 0x42, 'F10': 0x43, 'F11': 0x44, 'F12': 0x45,
+            'UP': 0x52, 'DOWN': 0x51, 'LEFT': 0x50, 'RIGHT': 0x4F,
+            'CAPSLOCK': 0x39, 'SCROLLLOCK': 0x47, 'NUMLOCK': 0x53,
+            'INSERT': 0x49, 'HOME': 0x4A, 'PAGEUP': 0x4B, 
+            'END': 0x4D, 'PAGEDOWN': 0x4E,
+            'MINUS': 0x2D, 'EQUAL': 0x2E, 'LEFTBRACKET': 0x2F, 'RIGHTBRACKET': 0x30,
+            'BACKSLASH': 0x31, 'SEMICOLON': 0x33, 'QUOTE': 0x34, 'GRAVE': 0x35,
+            'COMMA': 0x36, 'PERIOD': 0x37, 'SLASH': 0x38
+        };
+
+        const HID_MODIFIER_BITS = {
+            'MOD_LEFT_CTRL': 0x01,
+            'MOD_LEFT_SHIFT': 0x02,
+            'MOD_LEFT_ALT': 0x04,
+            'MOD_LEFT_GUI': 0x08,
+            'MOD_RIGHT_CTRL': 0x10,
+            'MOD_RIGHT_SHIFT': 0x20,
+            'MOD_RIGHT_ALT': 0x40,
+            'MOD_RIGHT_GUI': 0x80
+        };
+
+        // ===== 扩展指令集定义 =====
+        const CMD_TYPE_PROFILE = 0x01;     // 旋转平移模式切换
+        const CMD_TYPE_CALIBRATE = 0x02;    // 陀螺仪校准  
+        const CMD_TYPE_LED = 0x03;          // LED控制
+
+        // 旋转平移模式切换指令
+        const PROFILE_CMD_SWITCH = 0x00;
+
+        // 陀螺仪校准指令  
+        const CALIBRATE_CMD_START = 0x00;
+
+        // LED控制指令
+        const LED_CMD_OFF = 0x00;
+        const LED_CMD_RED = 0x01;
+        const LED_CMD_GREEN = 0x02;
+        const LED_CMD_BLUE = 0x03;
+
+        // ===== 高级功能定义 =====
+        const ADVANCED_FUNCTIONS = {
+            // 旋转平移模式切换区
+            profile: {
+                name: '🔄 旋转平移模式切换',
+                icon: '🔄',
+                color: 'rgba(0, 150, 255, 0.2)',
+                borderColor: 'rgba(0, 150, 255, 0.5)',
+                functions: [
+                    { id: 'profile_switch', name: '模式切换', icon: '🔄', type: CMD_TYPE_PROFILE, cmd: PROFILE_CMD_SWITCH }
+                ]
+            },
+            // 陀螺仪校准区
+            calibrate: {
+                name: '🎯 陀螺仪校准',
+                icon: '🎯',
+                color: 'rgba(128, 0, 255, 0.2)',
+                borderColor: 'rgba(128, 0, 255, 0.5)',
+                functions: [
+                    { id: 'calibrate_start', name: '开始校准', icon: '🎯', type: CMD_TYPE_CALIBRATE, cmd: CALIBRATE_CMD_START }
+                ]
+            },
+            // LED控制区
+            led: {
+                name: '💡 LED控制',
+                icon: '💡',
+                color: 'rgba(255, 193, 7, 0.2)',
+                borderColor: 'rgba(255, 193, 7, 0.5)',
+                functions: [
+                    { id: 'led_off', name: '关闭', icon: '⚫', type: CMD_TYPE_LED, cmd: LED_CMD_OFF },
+                    { id: 'led_red', name: '红灯', icon: '🔴', type: CMD_TYPE_LED, cmd: LED_CMD_RED },
+                    { id: 'led_green', name: '绿灯', icon: '🟢', type: CMD_TYPE_LED, cmd: LED_CMD_GREEN },
+                    { id: 'led_blue', name: '蓝灯', icon: '🔵', type: CMD_TYPE_LED, cmd: LED_CMD_BLUE }
+                ]
+            }
+        };
+
+        // 键盘布局定义
+        const physicalKeyboardLayout = {
+            row1: [0, 1, 2, 3, 4, 5],     // K0-K5
+            row2: [6, 7, 8, 9, 10, 11],   // K6-K11
+            row3: [12, 13, 14, 15, 16],   // K12-K16
+            row4: [17, 18, 19, 20, 21],   // K17-K21
+            row5: [22, 23, 24]            // K22-K24
+        };
+
+        // 全局变量
+        let selectedKeyIndex = -1;
+        let keyMappings = new Array(25).fill('');
+        let hidMappings = new Array(25).fill('');
+        let extendedMappings = new Array(25).fill(null); // 存储扩展功能映射
+        let usbPort = null;
+        let isUSBConnected = false;
+        let currentPresetId = null;
+        let renamePresetId = null;
+        let keyboardPresets = JSON.parse(localStorage.getItem('keyboardPresets') || '[]');
+        let isAdvancedMode = false; // 是否处于高级功能选择模式
+        let clickTimer = null; // 单击双击判断计时器
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            createPhysicalKeyboardLayout();
+            createAdvancedFunctionsGrid();
+            document.addEventListener('keydown', handleKeyPress);
+            loadPresetList();
+            
+            const teamLogo = document.getElementById('teamLogo');
+            teamLogo.style.display = 'none';
+        });
+
+        // ===== 创建高级功能区 =====
+        function createAdvancedFunctionsGrid() {
+            const container = document.getElementById('advancedFunctionsGrid');
+            container.innerHTML = '';
+
+            Object.keys(ADVANCED_FUNCTIONS).forEach(categoryKey => {
+                const category = ADVANCED_FUNCTIONS[categoryKey];
+                const categoryElement = document.createElement('div');
+                categoryElement.className = `advanced-category ${categoryKey}`;
+                
+                categoryElement.innerHTML = `
+                    <div class="advanced-category-header">
+                        ${category.icon} ${category.name}
+                    </div>
+                    <div class="advanced-function-grid" id="category-${categoryKey}">
+                    </div>
+                `;
+                
+                container.appendChild(categoryElement);
+                
+                // 添加功能按键
+                const functionGrid = document.getElementById(`category-${categoryKey}`);
+                category.functions.forEach(func => {
+                    const functionBtn = document.createElement('div');
+                    functionBtn.className = `advanced-function-btn ${categoryKey}`;
+                    functionBtn.dataset.functionId = func.id;
+                    functionBtn.innerHTML = `
+                        <div class="advanced-function-icon">${func.icon}</div>
+                        <div class="advanced-function-name">${func.name}</div>
+                    `;
+                    functionBtn.onclick = () => selectAdvancedFunction(func);
+                    functionGrid.appendChild(functionBtn);
+                });
+            });
+        }
+
+        // ===== 高级功能选择逻辑 =====
+        function selectAdvancedFunction(func) {
+            if (selectedKeyIndex === -1) {
+                showNotification('请先选择要配置的物理按键', 'warning');
+                return;
+            }
+
+            // 保存扩展功能映射
+            extendedMappings[selectedKeyIndex] = func;
+            
+            // 清除普通按键映射
+            keyMappings[selectedKeyIndex] = '';
+            hidMappings[selectedKeyIndex] = '';
+            
+            // 清除当前存档状态
+            if (currentPresetId) {
+                currentPresetId = null;
+                loadPresetList();
+            }
+            
+            // 发送扩展指令到设备
+            sendExtendedCommand(selectedKeyIndex, func);
+            
+            // 更新UI显示
+            document.getElementById('keyMapping').textContent = `高级功能: ${func.name}`;
+            document.getElementById('hidCode').textContent = `EXT:0x${func.type.toString(16).padStart(2, '0')}:0x${func.cmd.toString(16).padStart(2, '0')}`;
+            document.getElementById('extendedFunction').textContent = func.name;
+            
+            const selectedKey = document.querySelector(`[data-key-index="${selectedKeyIndex}"]`);
+            if (selectedKey) {
+                selectedKey.classList.add('extended');
+                selectedKey.classList.remove('selected', 'programmed');
+            }
+            
+            // 退出高级功能选择模式
+            cancelAdvancedMode();
+            
+            const currentIndex = selectedKeyIndex;
+            selectedKeyIndex = -1;
+            document.getElementById('selectedKey').textContent = '无';
+            
+            showNotification(`K${currentIndex} 高级功能映射成功!\n功能: ${func.name}\n类型: ${getCategoryName(func.type)}`, 'success');
+            
+            console.log(`高级功能映射 - K${currentIndex}:`, func);
+        }
+
+        function getCategoryName(type) {
+            const typeNames = {
+                [CMD_TYPE_PROFILE]: '旋转平移模式切换',
+                [CMD_TYPE_CALIBRATE]: '陀螺仪校准',
+                [CMD_TYPE_LED]: 'LED控制'
+            };
+            return typeNames[type] || '未知';
+        }
+
+        function enterAdvancedMode() {
+            if (selectedKeyIndex === -1) {
+                showNotification('请先选择要配置的按键', 'warning');
+                return;
+            }
+            
+            isAdvancedMode = true;
+            const container = document.getElementById('advancedFunctionsContainer');
+            const keyboardContainer = document.querySelector('.ultra-realistic-keyboard');
+            
+            container.style.display = 'block';
+            keyboardContainer.classList.add('advanced-mode-active');
+            
+            document.getElementById('advancedSelectedKey').textContent = `K${selectedKeyIndex}`;
+            
+            // 滚动到高级功能区
+            container.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelAdvancedMode() {
+            isAdvancedMode = false;
+            const container = document.getElementById('advancedFunctionsContainer');
+            const keyboardContainer = document.querySelector('.ultra-realistic-keyboard');
+            
+            container.style.display = 'none';
+            keyboardContainer.classList.remove('advanced-mode-active');
+            
+            document.getElementById('advancedSelectedKey').textContent = '无';
+        }
+
+        function clearAdvancedMapping() {
+            if (selectedKeyIndex === -1) {
+                showNotification('请先选择要清除的按键', 'warning');
+                return;
+            }
+
+            extendedMappings[selectedKeyIndex] = null;
+            keyMappings[selectedKeyIndex] = '';
+            hidMappings[selectedKeyIndex] = '';
+            
+            const selectedKey = document.querySelector(`[data-key-index="${selectedKeyIndex}"]`);
+            if (selectedKey) {
+                selectedKey.classList.remove('extended', 'programmed', 'selected');
+            }
+            
+            document.getElementById('keyMapping').textContent = '请选择按键';
+            document.getElementById('hidCode').textContent = '-';
+            document.getElementById('extendedFunction').textContent = '无';
+            
+            cancelAdvancedMode();
+            showNotification(`K${selectedKeyIndex} 的高级功能已清除`, 'info');
+        }
+
+        // ===== HID代码转换函数 =====
+        function convertToHIDCode(keyString) {
+            if (!keyString) return { modifier: 0x00, keycode: 0x00 };
+            
+            let modifier = 0x00;
+            let keycode = 0x00;
+            
+            const parts = keyString.toUpperCase().split('+');
+            const mainKey = parts[parts.length - 1];
+            
+            for (let i = 0; i < parts.length - 1; i++) {
+                const mod = parts[i].trim();
+                switch(mod) {
+                    case 'CTRL':
+                    case 'CONTROL':
+                        modifier |= HID_MODIFIER_BITS['MOD_LEFT_CTRL'];
+                        break;
+                    case 'SHIFT':
+                        modifier |= HID_MODIFIER_BITS['MOD_LEFT_SHIFT'];
+                        break;
+                    case 'ALT':
+                        modifier |= HID_MODIFIER_BITS['MOD_LEFT_ALT'];
+                        break;
+                    case 'WIN':
+                    case 'GUI':
+                    case 'META':
+                    case 'CMD':
+                        modifier |= HID_MODIFIER_BITS['MOD_LEFT_GUI'];
+                        break;
+                }
+            }
+            
+            const normalizedKey = normalizeKeyToHID(mainKey.trim());
+            if (HID_KEYBOARD_CODES[normalizedKey] !== undefined) {
+                keycode = HID_KEYBOARD_CODES[normalizedKey];
+            } else {
+                console.warn('未找到HID代码:', normalizedKey, '原始:', mainKey);
+                keycode = 0x00;
+            }
+            
+            return { modifier, keycode };
+        }
+
+        function normalizeKeyToHID(key) {
+            const keyNameMap = {
+                ' ': 'SPACE', 'SPACEBAR': 'SPACE', 'RETURN': 'ENTER',
+                'ESC': 'ESCAPE', 'DEL': 'DELETE', 'ARROWUP': 'UP',
+                'ARROWDOWN': 'DOWN', 'ARROWLEFT': 'LEFT', 'ARROWRIGHT': 'RIGHT',
+                '.': 'DOT', 'PERIOD': 'DOT', '-': 'MINUS', '=': 'EQUAL',
+                '[': 'LEFTBRACKET', ']': 'RIGHTBRACKET', '\\': 'BACKSLASH',
+                ';': 'SEMICOLON', "'": 'QUOTE', '`': 'GRAVE',
+                ',': 'COMMA', '/': 'SLASH'
+            };
+            
+            const upperKey = key.toUpperCase();
+            
+            if (keyNameMap[upperKey]) {
+                return keyNameMap[upperKey];
+            }
+            
+            if (HID_KEYBOARD_CODES[upperKey] !== undefined) {
+                return upperKey;
+            }
+            
+            if (/^[A-Z0-9]$/.test(upperKey)) {
+                return upperKey;
+            }
+            
+            console.warn('无法标准化键名:', key, '->', upperKey);
+            return upperKey;
+        }
+
+        function formatHIDCode(modifier, keycode) {
+            return `0x${modifier.toString(16).padStart(2, '0').toUpperCase()}:0x${keycode.toString(16).padStart(2, '0').toUpperCase()}`;
+        }
+
+        // ===== 键盘布局创建 =====
+        function createPhysicalKeyboardLayout() {
+            const row1 = document.getElementById('keyboardRow1');
+            physicalKeyboardLayout.row1.forEach((keyIndex, i) => {
+                const size = i === 5 ? 'large-right' : 'standard';
+                const key = createRealisticKey(keyIndex, size);
+                row1.appendChild(key);
+            });
+
+            const row2 = document.getElementById('keyboardRow2');
+            physicalKeyboardLayout.row2.forEach((keyIndex, i) => {
+                const key = createRealisticKey(keyIndex, 'standard');
+                row2.appendChild(key);
+            });
+
+            const row3 = document.getElementById('keyboardRow3');
+            physicalKeyboardLayout.row3.forEach((keyIndex, i) => {
+                const key = createRealisticKey(keyIndex, 'standard');
+                row3.appendChild(key);
+            });
+
+            const row4 = document.getElementById('keyboardRow4');
+            physicalKeyboardLayout.row4.forEach((keyIndex, i) => {
+                const size = i === 0 ? 'large-vertical' : 'standard';
+                const key = createRealisticKey(keyIndex, size);
+                row4.appendChild(key);
+            });
+
+            const row5 = document.getElementById('keyboardRow5');
+            const spacer = document.createElement('div');
+            spacer.style.width = '55px';
+            row5.appendChild(spacer);
+            
+            physicalKeyboardLayout.row5.forEach((keyIndex, i) => {
+                let size = 'standard';
+                if (i === 0) {
+                    size = 'large-k23';
+                }
+                const key = createRealisticKey(keyIndex, size);
+                row5.appendChild(key);
+            });
+        }
+
+        function createRealisticKey(keyIndex, size = 'standard') {
+            const key = document.createElement('div');
+            key.className = `realistic-key ${size}`;
+            key.textContent = `K${keyIndex}`;
+            key.dataset.keyIndex = keyIndex;
+            key.onclick = (event) => handleKeyClick(keyIndex, event);
+            return key;
+        }
+
+        // ===== 优化的单击双击处理逻辑 =====
+        function handleKeyClick(index, event) {
+            // 阻止事件冒泡，确保点击响应准确
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // 取消之前的计时器
+            if (clickTimer) {
+                clearTimeout(clickTimer);
+                clickTimer = null;
+                // 这是双击
+                handleDoubleClick(index);
+            } else {
+                // 设置计时器，等待可能的第二次点击
+                clickTimer = setTimeout(() => {
+                    clickTimer = null;
+                    // 这是单击
+                    handleSingleClick(index);
+                }, 300); // 300ms内的第二次点击被认为是双击
+            }
+        }
+
+        // 处理单击 - 普通键值映射
+        function handleSingleClick(index) {
+            selectedKeyIndex = index;
+            
+            const keys = document.querySelectorAll('.realistic-key');
+            keys.forEach((key) => {
+                key.classList.remove('selected');
+                const keyIndex = parseInt(key.dataset.keyIndex);
+                if (keyMappings[keyIndex]) {
+                    key.classList.add('programmed');
+                } else if (extendedMappings[keyIndex]) {
+                    key.classList.add('extended');
+                }
+            });
+            
+            const selectedKey = document.querySelector(`[data-key-index="${index}"]`);
+            if (selectedKey) {
+                selectedKey.classList.add('selected');
+            }
+            
+            // 更新显示信息
+            document.getElementById('selectedKey').textContent = `K${index}`;
+            
+            if (extendedMappings[index]) {
+                const func = extendedMappings[index];
+                document.getElementById('keyMapping').textContent = `高级功能: ${func.name}`;
+                document.getElementById('hidCode').textContent = `EXT:0x${func.type.toString(16).padStart(2, '0')}:0x${func.cmd.toString(16).padStart(2, '0')}`;
+                document.getElementById('extendedFunction').textContent = func.name;
+            } else {
+                document.getElementById('keyMapping').textContent = keyMappings[index] || '等待按键输入...';
+                document.getElementById('hidCode').textContent = hidMappings[index] || '-';
+                document.getElementById('extendedFunction').textContent = '无';
+            }
+            
+            // 关闭高级功能区（如果之前打开了）
+            cancelAdvancedMode();
+            
+            showNotification(`K${index} 已选中，请按下键盘上的任意键进行映射`, 'info');
+        }
+
+        // 处理双击 - 进入高级功能模式
+        function handleDoubleClick(index) {
+            selectedKeyIndex = index;
+            
+            const keys = document.querySelectorAll('.realistic-key');
+            keys.forEach((key) => {
+                key.classList.remove('selected');
+                const keyIndex = parseInt(key.dataset.keyIndex);
+                if (keyMappings[keyIndex]) {
+                    key.classList.add('programmed');
+                } else if (extendedMappings[keyIndex]) {
+                    key.classList.add('extended');
+                }
+            });
+            
+            const selectedKey = document.querySelector(`[data-key-index="${index}"]`);
+            if (selectedKey) {
+                selectedKey.classList.add('selected');
+            }
+            
+            // 更新显示信息
+            document.getElementById('selectedKey').textContent = `K${index}`;
+            
+            if (extendedMappings[index]) {
+                const func = extendedMappings[index];
+                document.getElementById('keyMapping').textContent = `高级功能: ${func.name}`;
+                document.getElementById('hidCode').textContent = `EXT:0x${func.type.toString(16).padStart(2, '0')}:0x${func.cmd.toString(16).padStart(2, '0')}`;
+                document.getElementById('extendedFunction').textContent = func.name;
+            } else {
+                document.getElementById('keyMapping').textContent = keyMappings[index] || '等待高级功能选择...';
+                document.getElementById('hidCode').textContent = hidMappings[index] || '-';
+                document.getElementById('extendedFunction').textContent = '无';
+            }
+            
+            // 进入高级功能选择模式
+            enterAdvancedMode();
+            
+            showNotification(`K${index} 进入高级功能设置模式`, 'info');
+        }
+
+        // ===== 按键处理函数 =====
+        function handleKeyPress(event) {
+            if (selectedKeyIndex === -1 || document.getElementById('keyboardConfig').style.display === 'none') {
+                return;
+            }
+            
+            // 如果正在高级功能选择模式，阻止键盘输入
+            if (isAdvancedMode) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+            
+            event.preventDefault();
+            event.stopPropagation();
+            
+            let keyString = '';
+            const modifiers = [];
+            
+            if (event.ctrlKey) modifiers.push('CTRL');
+            if (event.altKey) modifiers.push('ALT');
+            if (event.shiftKey) modifiers.push('SHIFT');
+            if (event.metaKey) modifiers.push('WIN');
+            
+            let mainKey = event.key;
+            
+            if (['Control', 'Alt', 'Shift', 'Meta'].includes(mainKey)) {
+                return;
+            }
+            
+            let processedMainKey = '';
+            
+            switch(mainKey) {
+                case ' ': processedMainKey = 'SPACE'; break;
+                case 'Enter': processedMainKey = 'ENTER'; break;
+                case 'Escape': processedMainKey = 'ESCAPE'; break;
+                case 'Backspace': processedMainKey = 'BACKSPACE'; break;
+                case 'Delete': processedMainKey = 'DELETE'; break;
+                case 'Tab': processedMainKey = 'TAB'; break;
+                case 'ArrowUp': processedMainKey = 'UP'; break;
+                case 'ArrowDown': processedMainKey = 'DOWN'; break;
+                case 'ArrowLeft': processedMainKey = 'LEFT'; break;
+                case 'ArrowRight': processedMainKey = 'RIGHT'; break;
+                case 'CapsLock': processedMainKey = 'CAPSLOCK'; break;
+                case 'NumLock': processedMainKey = 'NUMLOCK'; break;
+                case 'ScrollLock': processedMainKey = 'SCROLLLOCK'; break;
+                case 'Insert': processedMainKey = 'INSERT'; break;
+                case 'Home': processedMainKey = 'HOME'; break;
+                case 'End': processedMainKey = 'END'; break;
+                case 'PageUp': processedMainKey = 'PAGEUP'; break;
+                case 'PageDown': processedMainKey = 'PAGEDOWN'; break;
+                case '.': processedMainKey = 'DOT'; break;
+                case '-': processedMainKey = 'MINUS'; break;
+                case '=': processedMainKey = 'EQUAL'; break;
+                case '[': processedMainKey = 'LEFTBRACKET'; break;
+                case ']': processedMainKey = 'RIGHTBRACKET'; break;
+                case '\\': processedMainKey = 'BACKSLASH'; break;
+                case ';': processedMainKey = 'SEMICOLON'; break;
+                case "'": processedMainKey = 'QUOTE'; break;
+                case '`': processedMainKey = 'GRAVE'; break;
+                case ',': processedMainKey = 'COMMA'; break;
+                case '/': processedMainKey = 'SLASH'; break;
+                default: processedMainKey = mainKey.toUpperCase();
+            }
+            
+            if (modifiers.length > 0) {
+                keyString = modifiers.join('+') + '+' + processedMainKey;
+            } else {
+                keyString = processedMainKey;
+            }
+            
+            const hidCode = convertToHIDCode(keyString);
+            const hidString = formatHIDCode(hidCode.modifier, hidCode.keycode);
+            
+            if (hidCode.keycode === 0x00 && processedMainKey !== 'NONE') {
+                console.warn('无效的HID代码转换:', keyString, hidCode);
+                showNotification(`按键 "${keyString}" 无法映射到有效的HID代码`, 'warning');
+                return;
+            }
+            
+            // 清除扩展功能映射
+            extendedMappings[selectedKeyIndex] = null;
+            keyMappings[selectedKeyIndex] = keyString;
+            hidMappings[selectedKeyIndex] = hidString;
+            
+            if (currentPresetId) {
+                currentPresetId = null;
+                loadPresetList();
+            }
+            
+            sendKeyMapping(selectedKeyIndex, keyString, hidCode);
+            
+            document.getElementById('keyMapping').textContent = keyString;
+            document.getElementById('hidCode').textContent = hidString;
+            document.getElementById('extendedFunction').textContent = '无';
+            
+            const selectedKey = document.querySelector(`[data-key-index="${selectedKeyIndex}"]`);
+            if (selectedKey) {
+                selectedKey.classList.add('programmed');
+                selectedKey.classList.remove('selected', 'extended');
+            }
+            
+            const currentIndex = selectedKeyIndex;
+            selectedKeyIndex = -1;
+            document.getElementById('selectedKey').textContent = '无';
+            
+            showNotification(`K${currentIndex} 映射成功!\n按键: ${keyString}\nHID: ${hidString}`, 'success');
+            
+            const actualCommand = `KEY:${currentIndex}:0x${hidCode.modifier.toString(16).padStart(2, '0').toUpperCase()}:0x${hidCode.keycode.toString(16).padStart(2, '0').toUpperCase()}`;
+            console.log(`发送命令: ${actualCommand}`);
+        }
+
+        // ===== 连接管理 =====
+        async function toggleUSBConnection(event) {
+            event.stopPropagation();
+            
+            if (!isUSBConnected) {
+                await connectUSB();
+            } else {
+                disconnectUSB();
+            }
+        }
+
+        async function connectUSB() {
+            try {
+                if (!('serial' in navigator)) {
+                    showNotification('您的浏览器不支持Web Serial API，请使用Chrome或Edge浏览器', 'error');
+                    return;
+                }
+
+                usbPort = await navigator.serial.requestPort();
+                await usbPort.open({ baudRate: 115200 });
+
+                isUSBConnected = true;
+                updateConnectionStatus();
+                showNotification('USB设备连接成功！', 'success');
+                
+                readFromUSB();
+                
+            } catch (error) {
+                console.error('USB连接失败:', error);
+                showNotification('USB连接失败，请检查设备连接', 'error');
+            }
+        }
+
+        function disconnectUSB() {
+            if (usbPort) {
+                usbPort.close();
+                usbPort = null;
+            }
+            isUSBConnected = false;
+            updateConnectionStatus();
+            showNotification('USB设备已断开连接', 'info');
+        }
+
+        function updateConnectionStatus() {
+            const usbStatus = document.getElementById('usbStatus');
+            const usbConnectBtn = document.getElementById('usbConnectBtn');
+            
+            if (isUSBConnected) {
+                usbStatus.classList.add('connected');
+                usbConnectBtn.textContent = '断开';
+            } else {
+                usbStatus.classList.remove('connected');
+                usbConnectBtn.textContent = '连接';
+            }
+        }
+
+        // ===== 界面切换 - 优化点击响应 =====
+        function showMainInterface() {
+            document.getElementById('mainInterface').style.display = 'block';
+            document.getElementById('keyboardConfig').style.display = 'none';
+            document.getElementById('mouseConfig').style.display = 'none';
+            selectedKeyIndex = -1;
+            cancelAdvancedMode();
+        }
+
+        // 优化键盘配置界面显示
+        function showKeyboardConfig() {
+            document.getElementById('mainInterface').style.display = 'none';
+            document.getElementById('keyboardConfig').style.display = 'block';
+            document.getElementById('mouseConfig').style.display = 'none';
+            
+            // 添加简短的视觉反馈
+            showNotification('进入键盘配置界面', 'info');
+        }
+
+        // 优化鼠标配置界面显示
+        function showMouseConfig() {
+            document.getElementById('mainInterface').style.display = 'none';
+            document.getElementById('keyboardConfig').style.display = 'none';
+            document.getElementById('mouseConfig').style.display = 'block';
+            
+            // 添加简短的视觉反馈
+            showNotification('进入鼠标配置界面', 'info');
+        }
+
+        function startConfiguration() {
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            const mainConfig = document.getElementById('mainConfig');
+            const teamLogo = document.getElementById('teamLogo');
+            
+            welcomeScreen.style.animation = 'welcomeSlideOut 0.8s ease-in-out forwards';
+            
+            setTimeout(() => {
+                welcomeScreen.style.display = 'none';
+                mainConfig.style.display = 'block';
+                teamLogo.style.display = 'flex';
+                mainConfig.style.animation = 'configSlideIn 0.8s ease-out forwards';
+            }, 800);
+        }
+
+        function showWelcomeScreen() {
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            const mainConfig = document.getElementById('mainConfig');
+            const teamLogo = document.getElementById('teamLogo');
+            
+            mainConfig.style.display = 'none';
+            teamLogo.style.display = 'none';
+            welcomeScreen.style.display = 'flex';
+            welcomeScreen.style.animation = 'welcomeSlideIn 0.8s ease-out forwards';
+            
+            showMainInterface();
+            selectedKeyIndex = -1;
+        }
+
+        function applySensitivity() {
+            const sensitivity = document.getElementById('sensitivityInput').value;
+            const value = parseInt(sensitivity);
+            
+            if (isNaN(value) || value < 0 || value > 100) {
+                showNotification('请输入0-100之间的数值', 'error');
+                return;
+            }
+            
+            sendMouseSensitivity(value);
+            document.getElementById('currentSensitivity').textContent = value;
+            
+            if (isUSBConnected) {
+                showNotification(`鼠标灵敏度已设置为: ${value}`, 'success');
+            } else {
+                showNotification(`鼠标灵敏度已设置为: ${value} (设备未连接，设置将在连接后生效)`, 'warning');
+            }
+        }
+
+        // ===== 数据发送函数 =====
+        async function sendKeyMapping(keyIndex, keyString, hidCode = null) {
+            if (!hidCode) {
+                hidCode = convertToHIDCode(keyString);
+            }
+            
+            const command = `KEY:${keyIndex}:0x${hidCode.modifier.toString(16).padStart(2, '0').toUpperCase()}:0x${hidCode.keycode.toString(16).padStart(2, '0').toUpperCase()}\n`;
+            await sendCommand(command);
+        }
+
+        async function sendExtendedCommand(keyIndex, func) {
+            // 简化扩展指令格式: EXT:<KeyIndex>:<TypeHex>:<CommandHex>
+            const command = `EXT:${keyIndex}:0x${func.type.toString(16).padStart(2, '0').toUpperCase()}:0x${func.cmd.toString(16).padStart(2, '0').toUpperCase()}\n`;
+            await sendCommand(command);
+            
+            console.log(`发送扩展指令: ${func.name}`);
+            console.log(`指令详情:`, {
+                按键索引: keyIndex,
+                指令类型: `0x${func.type.toString(16).padStart(2, '0').toUpperCase()}`,
+                命令代码: `0x${func.cmd.toString(16).padStart(2, '0').toUpperCase()}`,
+                完整命令: command.trim()
+            });
+        }
+
+        async function sendMouseSensitivity(sensitivity) {
+            const command = `MOUSE:${sensitivity}\n`;
+            await sendCommand(command);
+        }
+
+        async function sendCommand(command) {
+            try {
+                if (isUSBConnected && usbPort) {
+                    const writer = usbPort.writable.getWriter();
+                    const encoder = new TextEncoder();
+                    await writer.write(encoder.encode(command));
+                    writer.releaseLock();
+                    console.log(`USB发送: ${command.trim()}`);
+                } else {
+                    console.log(`离线模式: ${command.trim()}`);
+                }
+            } catch (error) {
+                console.error('发送命令失败:', error);
+                showNotification('发送命令失败: ' + error.message, 'error');
+            }
+        }
+
+        async function readFromUSB() {
+            if (!usbPort) return;
+
+            try {
+                const reader = usbPort.readable.getReader();
+                const decoder = new TextDecoder();
+
+                while (isUSBConnected) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value);
+                    console.log('USB收到数据:', text);
+                    handleReceivedData(text);
+                }
+
+                reader.releaseLock();
+            } catch (error) {
+                console.error('USB读取数据失败:', error);
+            }
+        }
+
+        function handleReceivedData(data) {
+            // 处理扩展指令反馈
+            if (data.includes('EXT_SET:')) {
+                const parts = data.replace('EXT_SET:', '').split(':');
+                if (parts.length >= 4) {
+                    const keyIndex = parseInt(parts[0]);
+                    const type = parts[1];
+                    const cmd = parts[2];
+                    
+                    let typeName = '';
+                    switch(parseInt(type, 16)) {
+                        case CMD_TYPE_PROFILE: typeName = '旋转平移模式切换'; break;
+                        case CMD_TYPE_CALIBRATE: typeName = '陀螺仪校准'; break;
+                        case CMD_TYPE_LED: typeName = 'LED控制'; break;
+                        default: typeName = '未知';
+                    }
+                    
+                    showNotification(`按键 K${keyIndex} ${typeName}指令设置成功 (${type}:${cmd})`, 'success');
+                }
+            }
+            // 处理基础指令反馈
+            else if (data.includes('OK:')) {
+                showNotification('设备确认：' + data.replace('OK:', ''), 'success');
+            } else if (data.includes('ERROR:')) {
+                showNotification('设备错误：' + data.replace('ERROR:', ''), 'error');
+            } else if (data.includes('KEY_SET:')) {
+                const parts = data.replace('KEY_SET:', '').split(':');
+                if (parts.length >= 3) {
+                    const keyIndex = parseInt(parts[0]);
+                    const modifier = parts[1];
+                    const keycode = parts[2];
+                    showNotification(`按键 K${keyIndex} 配置成功 (${modifier}:${keycode})`, 'success');
+                }
+            } else if (data.includes('MOUSE_SET:')) {
+                const sensitivity = data.replace('MOUSE_SET:', '').trim();
+                showNotification(`鼠标灵敏度设置成功: ${sensitivity}`, 'success');
+            }
+            // 处理设备状态反馈
+            else if (data.includes('PROFILE_SWITCHED:')) {
+                const profileId = data.replace('PROFILE_SWITCHED:', '').trim();
+                showNotification(`已切换旋转平移模式 ${profileId}`, 'info');
+            } else if (data.includes('CALIBRATION_DONE')) {
+                showNotification('陀螺仪校准完成', 'success');
+            } else if (data.includes('BATTERY:')) {
+                const level = data.replace('BATTERY:', '').trim();
+                showNotification(`电池电量: ${level}%`, 'info');
+            }
+        }
+
+        // ===== 存档管理功能 =====
+        function generatePresetId() {
+            return 'preset_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function showSavePresetModal() {
+            const modal = document.getElementById('savePresetModal');
+            const input = document.getElementById('presetNameInput');
+            
+            const now = new Date();
+            const defaultName = `配置方案 ${now.getMonth() + 1}-${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+            input.value = defaultName;
+            
+            modal.style.display = 'flex';
+            input.focus();
+            input.select();
+        }
+
+        function closeSavePresetModal() {
+            document.getElementById('savePresetModal').style.display = 'none';
+        }
+
+        function savePreset() {
+            const name = document.getElementById('presetNameInput').value.trim();
+            
+            if (!name) {
+                showNotification('请输入配置名称', 'error');
+                return;
+            }
+
+            const existingPreset = keyboardPresets.find(p => p.name === name);
+            if (existingPreset) {
+                if (!confirm(`已存在名为"${name}"的配置，是否覆盖？`)) {
+                    return;
+                }
+                existingPreset.mappings = [...keyMappings];
+                existingPreset.hidMappings = [...hidMappings];
+                existingPreset.extendedMappings = [...extendedMappings];
+                existingPreset.lastModified = new Date().toISOString();
+            } else {
+                const newPreset = {
+                    id: generatePresetId(),
+                    name: name,
+                    mappings: [...keyMappings],
+                    hidMappings: [...hidMappings],
+                    extendedMappings: [...extendedMappings],
+                    created: new Date().toISOString(),
+                    lastModified: new Date().toISOString()
+                };
+                keyboardPresets.unshift(newPreset);
+            }
+
+            localStorage.setItem('keyboardPresets', JSON.stringify(keyboardPresets));
+            loadPresetList();
+            closeSavePresetModal();
+            showNotification(`配置"${name}"保存成功！`, 'success');
+        }
+
+        function loadPresetList() {
+            const container = document.getElementById('presetList');
+            container.innerHTML = '';
+
+            if (keyboardPresets.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 40px; grid-column: 1 / -1;">
+                        <div style="font-size: 48px; margin-bottom: 15px;">📝</div>
+                        <div>暂无已保存的配置</div>
+                        <div style="font-size: 14px; margin-top: 8px;">配置完成后点击"保存当前配置"来创建存档</div>
+                    </div>
+                `;
+                return;
+            }
+
+            keyboardPresets.forEach(preset => {
+                const presetElement = createPresetElement(preset);
+                container.appendChild(presetElement);
+            });
+        }
+
+        function createPresetElement(preset) {
+            const element = document.createElement('div');
+            element.className = 'preset-item';
+            if (currentPresetId === preset.id) {
+                element.classList.add('active');
+            }
+            
+            const mappedKeys = preset.mappings.filter(m => m !== '').length;
+            const extendedKeys = (preset.extendedMappings || []).filter(m => m !== null).length;
+            const totalMapped = mappedKeys + extendedKeys;
+            const lastModified = new Date(preset.lastModified);
+            const timeStr = `${lastModified.getMonth() + 1}/${lastModified.getDate()} ${lastModified.getHours()}:${lastModified.getMinutes().toString().padStart(2, '0')}`;
+            
+            element.innerHTML = `
+                <div class="preset-name">${preset.name}</div>
+                <div class="preset-info">
+                    已配置按键: ${totalMapped}/25 (普通:${mappedKeys}, 高级:${extendedKeys})<br>
+                    最后修改: ${timeStr}
+                </div>
+                <div class="preset-actions">
+                    <button class="preset-action-btn" onclick="loadPreset('${preset.id}')">加载</button>
+                    <button class="preset-action-btn" onclick="showRenamePresetModal('${preset.id}')">重命名</button>
+                    <button class="preset-action-btn delete" onclick="deletePreset('${preset.id}')">删除</button>
+                </div>
+            `;
+            
+            return element;
+        }
+
+        function loadPreset(presetId) {
+            const preset = keyboardPresets.find(p => p.id === presetId);
+            if (!preset) {
+                showNotification('存档不存在', 'error');
+                return;
+            }
+
+            clearAllKeys(false);
+            keyMappings = [...preset.mappings];
+            hidMappings = [...(preset.hidMappings || new Array(25).fill(''))];
+            extendedMappings = [...(preset.extendedMappings || new Array(25).fill(null))];
+            currentPresetId = presetId;
+            
+            updateKeyboardUI();
+            loadPresetList();
+            sendAllKeyMappings();
+            showNotification(`已加载配置"${preset.name}"`, 'success');
+        }
+
+        function showRenamePresetModal(presetId) {
+            const preset = keyboardPresets.find(p => p.id === presetId);
+            if (!preset) return;
+            
+            renamePresetId = presetId;
+            const modal = document.getElementById('renamePresetModal');
+            const input = document.getElementById('renamePresetInput');
+            
+            input.value = preset.name;
+            modal.style.display = 'flex';
+            input.focus();
+            input.select();
+        }
+
+        function closeRenamePresetModal() {
+            document.getElementById('renamePresetModal').style.display = 'none';
+            renamePresetId = null;
+        }
+
+        function confirmRenamePreset() {
+            const newName = document.getElementById('renamePresetInput').value.trim();
+            
+            if (!newName) {
+                showNotification('请输入新的配置名称', 'error');
+                return;
+            }
+
+            const preset = keyboardPresets.find(p => p.id === renamePresetId);
+            if (!preset) {
+                showNotification('存档不存在', 'error');
+                closeRenamePresetModal();
+                return;
+            }
+
+            const existingPreset = keyboardPresets.find(p => p.name === newName && p.id !== renamePresetId);
+            if (existingPreset) {
+                showNotification('已存在相同名称的配置', 'error');
+                return;
+            }
+
+            preset.name = newName;
+            preset.lastModified = new Date().toISOString();
+            localStorage.setItem('keyboardPresets', JSON.stringify(keyboardPresets));
+            loadPresetList();
+            closeRenamePresetModal();
+            showNotification(`配置已重命名为"${newName}"`, 'success');
+        }
+
+        function deletePreset(presetId) {
+            const preset = keyboardPresets.find(p => p.id === presetId);
+            if (!preset) return;
+            
+            if (!confirm(`确定要删除配置"${preset.name}"吗？此操作无法撤销。`)) {
+                return;
+            }
+
+            const index = keyboardPresets.findIndex(p => p.id === presetId);
+            if (index !== -1) {
+                keyboardPresets.splice(index, 1);
+            }
+
+            if (currentPresetId === presetId) {
+                currentPresetId = null;
+            }
+
+            localStorage.setItem('keyboardPresets', JSON.stringify(keyboardPresets));
+            loadPresetList();
+            showNotification(`配置"${preset.name}"已删除`, 'info');
+        }
+
+        function loadDefaultPreset() {
+            if (!confirm('确定要重置为默认配置吗？当前未保存的配置将丢失。')) {
+                return;
+            }
+
+            clearAllKeys(false);
+            currentPresetId = null;
+            loadPresetList();
+            showNotification('已重置为默认配置', 'info');
+        }
+
+        function clearAllKeys(showConfirm = true) {
+            if (showConfirm && !confirm('确定要清空所有按键配置吗？')) {
+                return;
+            }
+
+            keyMappings.fill('');
+            hidMappings.fill('');
+            extendedMappings.fill(null);
+            selectedKeyIndex = -1;
+            currentPresetId = null;
+            
+            updateKeyboardUI();
+            loadPresetList();
+            cancelAdvancedMode();
+            
+            document.getElementById('selectedKey').textContent = '无';
+            document.getElementById('keyMapping').textContent = '请选择按键';
+            document.getElementById('hidCode').textContent = '-';
+            document.getElementById('extendedFunction').textContent = '无';
+            
+            if (showConfirm) {
+                showNotification('已清空所有按键配置', 'info');
+            }
+        }
+
+        function updateKeyboardUI() {
+            const keys = document.querySelectorAll('.realistic-key');
+            keys.forEach((key) => {
+                const keyIndex = parseInt(key.dataset.keyIndex);
+                key.classList.remove('selected', 'programmed', 'extended');
+                
+                if (extendedMappings[keyIndex]) {
+                    key.classList.add('extended');
+                } else if (keyMappings[keyIndex]) {
+                    key.classList.add('programmed');
+                }
+            });
+        }
+
+        async function sendAllKeyMappings() {
+            for (let i = 0; i < keyMappings.length; i++) {
+                if (extendedMappings[i]) {
+                    await sendExtendedCommand(i, extendedMappings[i]);
+                } else if (keyMappings[i]) {
+                    await sendKeyMapping(i, keyMappings[i]);
+                }
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+        }
+
+        // ===== 通知系统 =====
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                border-radius: 15px;
+                color: white;
+                font-weight: bold;
+                z-index: 10000;
+                animation: slideInRight 0.4s ease;
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+                font-family: 'Orbitron', monospace;
+                max-width: 350px;
+                font-size: 14px;
+                line-height: 1.4;
+            `;
+            
+            switch(type) {
+                case 'success':
+                    notification.style.background = 'linear-gradient(45deg, #00ff80, #00cc66)';
+                    break;
+                case 'error':
+                    notification.style.background = 'linear-gradient(45deg, #ff4040, #cc0000)';
+                    break;
+                case 'warning':
+                    notification.style.background = 'linear-gradient(45deg, #ffaa00, #ff8800)';
+                    break;
+                default:
+                    notification.style.background = 'linear-gradient(45deg, #00aaff, #0088cc)';
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.4s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 400);
+            }, 4000);
+        }
+
+        // ===== 键盘事件处理 =====
+        document.addEventListener('keydown', function(event) {
+            const saveModal = document.getElementById('savePresetModal');
+            const renameModal = document.getElementById('renamePresetModal');
+            
+            if (saveModal.style.display === 'flex') {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    savePreset();
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeSavePresetModal();
+                }
+                return;
+            }
+            
+            if (renameModal.style.display === 'flex') {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    confirmRenamePreset();
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeRenamePresetModal();
+                }
+                return;
+            }
+        });
+
+        // ===== 调试信息显示 =====
+        console.log('3D键鼠配置程序已加载（改进版）');
+        console.log('✅ 已优化键盘区和鼠标区的点击响应');
+        console.log('✅ 移除了悬停高亮依赖，改为直接点击响应');
+        console.log('✅ 加强了点击事件的阻止冒泡和默认行为');
+        console.log('✅ 优化了视觉反馈和用户体验');
+        console.log('操作逻辑：单击=普通映射，双击=高级功能');
+        console.log('HID键盘码表已初始化，共', Object.keys(HID_KEYBOARD_CODES).length, '个键值');
+        console.log('修饰键码表已初始化，共', Object.keys(HID_MODIFIER_BITS).length, '个修饰键');
+        
+        // 测试HID转换功能
+        console.log('测试HID转换:');
+        console.log('A键:', convertToHIDCode('A'));
+        console.log('Ctrl+C:', convertToHIDCode('CTRL+C'));
+        console.log('Alt+Tab:', convertToHIDCode('ALT+TAB'));
+    </script>
+</body>
+</html>
