@@ -18,8 +18,6 @@
 
 ## 工程文件结构
 
-本仓库主要包含两个核心部分的固件：
-
 * **`Spacemouse_develop/`**: 这是 3D 鼠标设备本身的主体固件。
   * `APP/`: 应用层代码，包括主逻辑 `main.c` 和模式管理 `mode_manager.c` 等。
   * `Driver/`: 驱动程序，用于控制 MPU9250 传感器、CH450 按键芯片和 WS2812B RGB LED。
