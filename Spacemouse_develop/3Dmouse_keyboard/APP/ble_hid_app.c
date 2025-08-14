@@ -23,8 +23,19 @@
 
 //用户自定义
 #include "motion_engine.h"
+#include <stdlib.h>
+#include "mode_manager.h"
+#include "rf_middleware_tx.h"
 extern MotionEngine_State mouse_motion;
 extern void dispatch_mouse_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel);
+#define KEYBOARD_REPORT_INTERVAL_MS 50 // 定义键盘回报周期为50ms
+static uint8_t last_kbd_report[8] = {0};
+//陀螺仪校准
+int32_t sample_count_ble = 0;
+static float yaw_offset = 0.0f; // 用来存储计算出的零点偏移
+static float roll_offset = 0.0f; // 用来存储计算出的零点偏移
+static float pitch_offset = 0.0f; // 用来存储计算出的零点偏移
+bool is_calibrated_ble = false; // 校准状态标志
 /*********************************************************************
  * MACROS
  */
@@ -48,10 +59,10 @@ extern void dispatch_mouse_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t 
 #define DEFAULT_HID_IDLE_TIMEOUT             60000
 
 // Minimum connection interval (units of 1.25ms)
-#define DEFAULT_DESIRED_MIN_CONN_INTERVAL    8
+#define DEFAULT_DESIRED_MIN_CONN_INTERVAL    40
 
 // Maximum connection interval (units of 1.25ms)
-#define DEFAULT_DESIRED_MAX_CONN_INTERVAL    8
+#define DEFAULT_DESIRED_MAX_CONN_INTERVAL    40
 
 // Slave latency to use if parameter update request
 #define DEFAULT_DESIRED_SLAVE_LATENCY        0
@@ -161,7 +172,6 @@ static uint8_t hidEmuRptCB(uint8_t id, uint8_t type, uint16_t uuid,
                            uint8_t oper, uint16_t *pLen, uint8_t *pData);
 static void    hidEmuEvtCB(uint8_t evt);
 static void    hidEmuStateCB(gapRole_States_t newState, gapRoleEvent_t *pEvent);
-
 /*********************************************************************
  * PROFILE CALLBACKS
  */
@@ -300,44 +310,8 @@ uint16_t HidEmu_ProcessEvent(uint8_t task_id, uint16_t events)
 
     if(events & START_REPORT_EVT)
     {
-        // --- 1. 定义参数 ---
-        // 死区角度：小于这个角度的倾斜将被忽略，防止漂移
-        const float ANGLE_DEAD_ZONE = 5.0f; // 单位：度
-        // 最大输入角度：当设备倾斜到这个角度时，达到最大输出速度
-        const float MAX_INPUT_ANGLE = 45.0f; // 单位：度
-        // --- 2. 获取姿态数据 ---
-        MotionEngine_Update(&mouse_motion, 0.1f);
-
-        float pitch = mouse_motion.euler_angles[1];
-        float roll = mouse_motion.euler_angles[0];
-        float yaw = mouse_motion.euler_angles[2];
-
-        // --- 3. 应用死区 ---
-        if (fabs(pitch) < ANGLE_DEAD_ZONE) pitch = 0.0f;
-        if (fabs(roll) < ANGLE_DEAD_ZONE)  roll = 0.0f;
-        if (fabs(yaw) < ANGLE_DEAD_ZONE)   yaw = 0.0f;
-
-        // --- 4. 建立简单映射关系 ---
-        // 旋转：将 Pitch, Roll, Yaw 直接映射到旋转轴
-        float rot_x_f = pitch; // 前后倾斜 -> 围绕X轴旋转
-        float rot_y_f = roll;  // 左右倾斜 -> 围绕Y轴旋转
-        float rot_z_f = yaw;   // 水平扭动 -> 围绕Z轴旋转
-
-        // 平移：为了演示，我们复用一些轴
-        float trans_x_f = roll;  // 左右倾斜 -> 同时也左右平移
-        float trans_y_f = 0.0f;  // 暂时不用Y轴平移
-        float trans_z_f = -pitch; // 前后倾斜 -> 同时也前后平移(Zoom)，加负号更直观
-
-        // --- 5. 数据缩放 (-350 ~ +350) 和类型转换 ---
-        // 这里我们进行线性缩放，并确保值不会超出范围
-        int16_t trans_x = (int16_t) fmaxf(-350.0f, fminf(350.0f, (trans_x_f / MAX_INPUT_ANGLE) * 350.0f));
-        int16_t trans_y = (int16_t) fmaxf(-350.0f, fminf(350.0f, (trans_y_f / MAX_INPUT_ANGLE) * 350.0f));
-        int16_t trans_z = (int16_t) fmaxf(-350.0f, fminf(350.0f, (trans_z_f / MAX_INPUT_ANGLE) * 350.0f));
-        int16_t rot_x   = (int16_t) fmaxf(-350.0f, fminf(350.0f, (rot_x_f / MAX_INPUT_ANGLE) * 350.0f));
-        int16_t rot_y   = (int16_t) fmaxf(-350.0f, fminf(350.0f, (rot_y_f / MAX_INPUT_ANGLE) * 350.0f));
-        int16_t rot_z   = (int16_t) fmaxf(-350.0f, fminf(350.0f, (rot_z_f / MAX_INPUT_ANGLE) * 350.0f));
-        hidEmuSendSpaceMouseReport(trans_x, trans_y, trans_z, rot_x, rot_y, rot_z);
-        tmos_start_task(hidEmuTaskId, START_REPORT_EVT, 100);
+        ahrs_task();
+        tmos_start_task(hidEmuTaskId, START_REPORT_EVT, 50);
         return (events ^ START_REPORT_EVT);
     }
     return 0;
@@ -369,46 +343,64 @@ static void hidEmu_ProcessTMOSMsg(tmos_event_hdr_t *pMsg)
 void hidEmuSendKeyReport(const uint8_t *report)
 {
     // 调用底层函数，使用键盘的报告ID (HID_RPT_ID_KEY_IN) 发送数据
-    HidDev_Report(HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT,
-                  8, (uint8_t*)report);
+    // 调用底层函数，并检查返回值
+    uint8_t status = HidDev_Report(HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT,
+                                   8, (uint8_t*)report);
+
+    // 如果发送失败 (没有可用缓冲区)
+    if (status == MSG_BUFFER_NOT_AVAIL)
+    {
+        // 在这里处理失败情况
+        // 简单的处理方式是稍后重试，例如设置一个标志位，在下一个事件循环中再次发送
+        // 也可以在此打印一条错误信息，方便调试
+        PRINT("Keyboard report dropped, no buffer available.\n");
+    }
 }
 
-/*********************************************************************
- * @brief   构建并发送SpaceMouse的HID报告 (平移和旋转)
- * @param   trans_x, trans_y, trans_z - 平移轴数据 (-350 ~ 350)
- * @param   rot_x, rot_y, rot_z - 旋转轴数据 (-350 ~ 350)
- * @return  none
+/**
+ * @brief 通过BLE发送SpaceMouse的6轴数据报告（升级版）
+ * @note  此版本根据当前模式（平移或旋转），发送一个有效的数据报告，
+ * 并紧接着发送一个另一类型的零值报告。
+ * 这可以主动清除主机上对应轴的陈旧状态，是比交替发送更稳健的策略。
  */
 void hidEmuSendSpaceMouseReport(int16_t trans_x, int16_t trans_y, int16_t trans_z,
-                                  int16_t rot_x, int16_t rot_y, int16_t rot_z)
+                                int16_t rot_x, int16_t rot_y, int16_t rot_z)
 {
-    // 1. 准备并发送平移报告 (ID 2)
-    uint8_t trans_buf[6];
-    // 将16位的整数拆分为两个8位的字节 (小端模式)
-    trans_buf[0] = LO_UINT16(trans_x);
-    trans_buf[1] = HI_UINT16(trans_x);
-    trans_buf[2] = LO_UINT16(trans_y);
-    trans_buf[3] = HI_UINT16(trans_y);
-    trans_buf[4] = LO_UINT16(trans_z);
-    trans_buf[5] = HI_UINT16(trans_z);
+    uint8_t report_buf[6];
 
-    // 使用我们之前定义的报告ID 2来发送平移数据
-    HidDev_Report(HID_RPT_ID_SPACE_TRANS_IN, HID_REPORT_TYPE_INPUT, 6, trans_buf);
+    if (ModeManager_IsRotationMode())
+    {
+        // === 旋转模式: 连续发送 有效旋转 + 零值平移 ===
+        // 1. 发送有效的旋转报告
+        report_buf[0] = LO_UINT16(rot_x);
+        report_buf[1] = HI_UINT16(rot_x);
+        report_buf[2] = LO_UINT16(rot_y);
+        report_buf[3] = HI_UINT16(rot_y);
+        report_buf[4] = LO_UINT16(rot_z);
+        report_buf[5] = HI_UINT16(rot_z);
+        HidDev_Report(HID_RPT_ID_SPACE_ROT_IN, HID_REPORT_TYPE_INPUT, 6, report_buf);
 
-    // 2. 准备并发送旋转报告 (ID 3)
-    uint8_t rot_buf[6];
-    // 将16位的整数拆分为两个8位的字节 (小端模式)
-    rot_buf[0] = LO_UINT16(rot_x);
-    rot_buf[1] = HI_UINT16(rot_x);
-    rot_buf[2] = LO_UINT16(rot_y);
-    rot_buf[3] = HI_UINT16(rot_y);
-    rot_buf[4] = LO_UINT16(rot_z);
-    rot_buf[5] = HI_UINT16(rot_z);
+        // 2. 立即发送零值的平移报告
+        memset(report_buf, 0, 6);
+        HidDev_Report(HID_RPT_ID_SPACE_TRANS_IN, HID_REPORT_TYPE_INPUT, 6, report_buf);
+    }
+    else
+    {
+        // === 平移模式: 连续发送 有效平移 + 零值旋转 ===
+        // 1. 发送有效的平移报告
+        report_buf[0] = LO_UINT16(trans_x);
+        report_buf[1] = HI_UINT16(trans_x);
+        report_buf[2] = LO_UINT16(trans_y);
+        report_buf[3] = HI_UINT16(trans_y);
+        report_buf[4] = LO_UINT16(trans_z);
+        report_buf[5] = HI_UINT16(trans_z);
+        HidDev_Report(HID_RPT_ID_SPACE_TRANS_IN, HID_REPORT_TYPE_INPUT, 6, report_buf);
 
-    // 使用我们之前定义的报告ID 3来发送旋转数据
-    HidDev_Report(HID_RPT_ID_SPACE_ROT_IN, HID_REPORT_TYPE_INPUT, 6, rot_buf);
+        // 2. 立即发送零值的旋转报告
+        memset(report_buf, 0, 6);
+        HidDev_Report(HID_RPT_ID_SPACE_ROT_IN, HID_REPORT_TYPE_INPUT, 6, report_buf);
+    }
 }
-
 /*********************************************************************
  * @fn      hidEmuStateCB
  *
@@ -465,9 +457,10 @@ static void hidEmuStateCB(gapRole_States_t newState, gapRoleEvent_t *pEvent)
             else if(pEvent->gap.opcode == GAP_LINK_TERMINATED_EVENT)
             {
                 PRINT("Disconnected.. Reason:%x\n", pEvent->linkTerminate.reason);
-                // ==================== 新增的核心逻辑 ====================
                 // 在连接断开时，重置全局连接句柄
-                hidEmuConnHandle = GAP_CONNHANDLE_INIT; //
+                hidEmuConnHandle = GAP_CONNHANDLE_INIT;
+                // 停止所有周期性回报任务
+                tmos_stop_task(hidEmuTaskId, START_REPORT_EVT);
                 // =======================================================
             }
             else if(pEvent->gap.opcode == GAP_LINK_ESTABLISHED_EVENT)

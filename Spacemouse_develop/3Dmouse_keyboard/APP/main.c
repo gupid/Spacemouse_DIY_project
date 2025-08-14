@@ -11,7 +11,7 @@
 
 MotionEngine_State mouse_motion;
 volatile uint8_t g_ahrs_update_flag = 0;
-
+extern volatile uint8_t g_ws2812b_dma_busy;
 /*********************************************************************
  * GLOBAL TYPEDEFS
  */
@@ -54,6 +54,7 @@ void Main_Circulation()
     while(1)
     {
        ModeManager_MainLoop();
+       keyboard_LED_display();
     }
 }
 
@@ -76,7 +77,7 @@ int main(void)
     PFIC_SetPriority(TMR1_IRQn,2);
     PFIC_DisableIRQ(TMR1_IRQn);
     Keyboard_Init();
-    WS2812B_SetAllLeds(120,0,0);
+    WS2812B_Init();
     ModeManager_Init();
     MotionEngine_Init(&mouse_motion);
     Main_Circulation(); // 进入主循环

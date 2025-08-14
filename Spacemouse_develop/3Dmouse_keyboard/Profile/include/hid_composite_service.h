@@ -26,14 +26,16 @@ extern "C" {
  */
 
 // Number of HID reports defined in the service
-#define HID_NUM_REPORTS        8
+#define HID_NUM_REPORTS        10
 
 // HID Report IDs for the service
-#define HID_RPT_ID_KEY_IN      1                      // Keyboard input report ID
-#define HID_RPT_ID_LED_OUT     1                      // LED output report ID
-#define HID_RPT_ID_SPACE_TRANS_IN     2  // SpaceMouse translation input report ID
-#define HID_RPT_ID_SPACE_ROT_IN       3               // SpaceMouse rotation input report ID
-#define HID_RPT_ID_FEATURE     4                      // Feature report ID
+#define HID_RPT_ID_KEY_IN      5                      // Keyboard input report ID
+#define HID_RPT_ID_LED_OUT     5                      // LED output report ID
+#define HID_RPT_ID_SPACE_TRANS_IN     1               // SpaceMouse translation input report ID
+#define HID_RPT_ID_SPACE_ROT_IN       2               // SpaceMouse rotation input report ID
+#define HID_RPT_ID_SPACE_BTN_IN       3  // SpaceMouse button input report ID
+#define HID_RPT_ID_SPACE_LED_OUT      4  // SpaceMouse LED output report ID (与输入方向不同,可以共用ID)
+#define HID_RPT_ID_FEATURE     6                      // Feature report ID
 // HID feature flags
 #define HID_FEATURE_FLAGS      HID_FLAGS_REMOTE_WAKE
 

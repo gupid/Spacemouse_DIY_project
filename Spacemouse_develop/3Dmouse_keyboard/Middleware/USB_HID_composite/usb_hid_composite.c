@@ -1,6 +1,21 @@
 #include "usb_hid_composite.h"
 
+
+// 定义CDC类请求码
+#define CDC_SET_LINE_CODING         0x20
+#define CDC_GET_LINE_CODING         0x21
+#define CDC_SET_CONTROL_LINE_STATE  0x22
+
+// CDC串口线路状态变量 (7字节: BPS, StopBits, Parity, DataBits)
+uint8_t CDC_LineCoding[] = {0x00, 0xC2, 0x01, 0x00, 0x00, 0x00, 0x08}; // 115200bps, 1 stop, no parity, 8 data
+
+
 #define DevEP0SIZE    0x40
+#define CDC_RX_BUF_SIZE 64
+uint8_t cdc_rx_buffer[CDC_RX_BUF_SIZE];
+uint8_t cdc_rx_len = 0;
+
+void cdc_send_data(const uint8_t* data, uint8_t len); // 提前声明数据发送函数
 
 /*HID类报表描述符*/
 const uint8_t KeyRepDesc[] = {0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x05, 0x07, 0x19, 0xe0, 0x29, 0xe7, 0x15, 0x00, 0x25,
@@ -86,73 +101,44 @@ const uint8_t MyCfgDescr[] = {
     /******************** 配置描述符 ********************/
     0x09,        // bLength
     0x02,        // bDescriptorType (Configuration)
-    0x42, 0x00,  // wTotalLength = 66 bytes
-    0x02,        // bNumInterfaces: 2个接口
+    // [!! 已修正 !!] wTotalLength: 总长度 = 原HID(66) + 新CDC(66) = 132 (0x84)
+    0x84, 0x00,
+    // [!! 已修正 !!] bNumInterfaces: 接口总数 = 键盘(0) + SpaceMouse(1) + CDC通信(2) + CDC数据(3) = 4个
+    0x04,
     0x01,        // bConfigurationValue
     0x00,        // iConfiguration
     0xA0,        // bmAttributes (Bus-powered, Remote Wakeup)
     0x32,        // bMaxPower (100mA)
 
-    /******************** 接口0: 键盘 ********************/
-    /* 接口描述符 */
-    0x09,        // bLength
-    0x04,        // bDescriptorType (Interface)
-    0x00,        // bInterfaceNumber: 0
-    0x00,        // bAlternateSetting
-    0x01,        // bNumEndpoints: 1个 (EP1 IN)
-    0x03,        // bInterfaceClass (HID)
-    0x01,        // bInterfaceSubClass (Boot Interface Subclass)
-    0x01,        // bInterfaceProtocol (Keyboard)
-    0x00,        // iInterface
-    /* HID类描述符 */
-    0x09,        // bLength
-    0x21,        // bDescriptorType (HID)
-    0x11, 0x01,  // bcdHID
-    0x00,        // bCountryCode
-    0x01,        // bNumDescriptors
-    0x22,        // bDescriptorType (Report)
-    sizeof(KeyRepDesc), 0x00, // wDescriptorLength
-    /* 端点描述符 IN */
-    0x07,        // bLength
-    0x05,        // bDescriptorType (Endpoint)
-    0x81,        // bEndpointAddress (EP1 IN)
-    0x03,        // bmAttributes (Interrupt)
-    0x08, 0x00,  // wMaxPacketSize (8 bytes)
-    0x0A,        // bInterval (10ms)
+    /******************** 接口 0: 键盘 (保持不变) ********************/
+    0x09, 0x04, 0x00, 0x00, 0x01, 0x03, 0x01, 0x01, 0x00,
+    0x09, 0x21, 0x11, 0x01, 0x00, 0x01, 0x22, sizeof(KeyRepDesc), 0x00,
+    0x07, 0x05, 0x81, 0x03, 0x08, 0x00, 0x0A,
 
-    /******************** 接口1: SpaceMouse ********************/
-    /* 接口描述符 */
-    0x09,        // bLength
-    0x04,        // bDescriptorType (Interface)
-    0x01,        // bInterfaceNumber: 1
-    0x00,        // bAlternateSetting
-    0x02,        // bNumEndpoints: 2个 (EP2 IN, EP2 OUT)
-    0x03,        // bInterfaceClass (HID)
-    0x00,        // bInterfaceSubClass
-    0x00,        // bInterfaceProtocol
-    0x00,        // iInterface
-    /* HID类描述符 */
-    0x09,        // bLength
-    0x21,        // bDescriptorType (HID)
-    0x11, 0x01,  // bcdHID
-    0x00,        // bCountryCode
-    0x01,        // bNumDescriptors
-    0x22,        // bDescriptorType (Report)
-    sizeof(SpaceMouseRepDesc), 0x00, // wDescriptorLength
-    /* 端点描述符 IN */
-    0x07,        // bLength
-    0x05,        // bDescriptorType (Endpoint)
-    0x82,        // bEndpointAddress (EP2 IN)
-    0x03,        // bmAttributes (Interrupt)
-    0x08, 0x00,  // wMaxPacketSize (8 bytes)
-    0x08,        // bInterval (8ms)
-    /* 端点描述符 OUT */
-    0x07,        // bLength
-    0x05,        // bDescriptorType (Endpoint)
-    0x02,        // bEndpointAddress (EP2 OUT)
-    0x03,        // bmAttributes (Interrupt)
-    0x08, 0x00,  // wMaxPacketSize (8 bytes)
-    0x08,        // bInterval (8ms)
+    /******************** 接口 1: SpaceMouse (保持不变) ********************/
+    0x09, 0x04, 0x01, 0x00, 0x02, 0x03, 0x00, 0x00, 0x00,
+    0x09, 0x21, 0x11, 0x01, 0x00, 0x01, 0x22, sizeof(SpaceMouseRepDesc), 0x00,
+    0x07, 0x05, 0x82, 0x03, 0x08, 0x00, 0x08,
+    0x07, 0x05, 0x02, 0x03, 0x08, 0x00, 0x08,
+
+    /******************** [!! 新增 !!] CDC 虚拟串口功能 ********************/
+    /* (1) 接口关联描述符 (IAD) */
+    0x08, 0x0B, 0x02, 0x02, 0x02, 0x02, 0x01, 0x00,
+    /* (2) CDC 通信接口 (Interface 2) */
+    0x09, 0x04, 0x02, 0x00, 0x01, 0x02, 0x02, 0x01, 0x00,
+    /* CDC 类特定描述符 */
+    0x05, 0x24, 0x00, 0x10, 0x01, // Header
+    0x05, 0x24, 0x01, 0x00, 0x03, // Call Management
+    0x04, 0x24, 0x02, 0x02,       // ACM
+    0x05, 0x24, 0x06, 0x02, 0x03, // Union
+    /* CDC 通知端点 (Endpoint 4 IN) */
+    0x07, 0x05, 0x84, 0x03, 0x08, 0x00, 0xFF,
+    /* (3) CDC 数据接口 (Interface 3) */
+    0x09, 0x04, 0x03, 0x00, 0x02, 0x0A, 0x00, 0x00, 0x00,
+    /* CDC 数据端点 (Endpoint 3 OUT) */
+    0x07, 0x05, 0x03, 0x02, 0x40, 0x00, 0x00,
+    /* CDC 数据端点 (Endpoint 3 IN) */
+    0x07, 0x05, 0x83, 0x02, 0x40, 0x00, 0x00
 };
 
 /* USB速度匹配描述符 */
@@ -184,7 +170,6 @@ __attribute__((aligned(4))) uint8_t EP0_Databuf[64 + 64 + 64]; //ep0(64)+ep4_out
 __attribute__((aligned(4))) uint8_t EP1_Databuf[64 + 64];      //ep1_out(64)+ep1_in(64)
 __attribute__((aligned(4))) uint8_t EP2_Databuf[64 + 64];      //ep2_out(64)+ep2_in(64)
 __attribute__((aligned(4))) uint8_t EP3_Databuf[64 + 64];      //ep3_out(64)+ep3_in(64)
-
 /*********************************************************************
  * @fn      USB_DevTransProcess
  *
@@ -205,107 +190,90 @@ void USB_DevTransProcess(void)
             switch(R8_USB_INT_ST & (MASK_UIS_TOKEN | MASK_UIS_ENDP))
             // 分析操作令牌和端点号
             {
-                case UIS_TOKEN_IN:
+                case UIS_TOKEN_IN: // 端点0 IN
                 {
                     switch(SetupReqCode)
                     {
                         case USB_GET_DESCRIPTOR:
-                            len = SetupReqLen >= DevEP0SIZE ? DevEP0SIZE : SetupReqLen; // 本次传输长度
-                            memcpy(pEP0_DataBuf, pDescr, len);                          /* 加载上传数据 */
+                            len = SetupReqLen >= DevEP0SIZE ? DevEP0SIZE : SetupReqLen;
+                            memcpy(pEP0_DataBuf, pDescr, len);
                             SetupReqLen -= len;
                             pDescr += len;
                             R8_UEP0_T_LEN = len;
-                            R8_UEP0_CTRL ^= RB_UEP_T_TOG; // 翻转
+                            R8_UEP0_CTRL ^= RB_UEP_T_TOG;
                             break;
                         case USB_SET_ADDRESS:
                             R8_USB_DEV_AD = (R8_USB_DEV_AD & RB_UDA_GP_BIT) | SetupReqLen;
                             R8_UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
                             break;
-
-                        case USB_SET_FEATURE:
-                            break;
-
                         default:
-                            R8_UEP0_T_LEN = 0; // 状态阶段完成中断或者是强制上传0长度数据包结束控制传输
+                            R8_UEP0_T_LEN = 0; // 状态阶段完成
                             R8_UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
                             break;
                     }
                 }
                 break;
 
-                case UIS_TOKEN_OUT:
+                case UIS_TOKEN_OUT: // 端点0 OUT
                 {
                     len = R8_USB_RX_LEN;
-                    if(SetupReqCode == 0x09)
+                    if(SetupReqCode == 0x09) // SET_REPORT, 用于键盘LED
                     {
-                        PRINT("[%s] Num Lock\t", (pEP0_DataBuf[0] & (1<<0)) ? "*" : " ");
-                        PRINT("[%s] Caps Lock\t", (pEP0_DataBuf[0] & (1<<1)) ? "*" : " ");
-                        PRINT("[%s] Scroll Lock\n", (pEP0_DataBuf[0] & (1<<2)) ? "*" : " ");
+                        // LED灯状态处理代码
+                    }
+                    if (SetupReqCode == CDC_SET_LINE_CODING) // CDC设置线路状态
+                    {
+                        if(len >= sizeof(CDC_LineCoding))
+                        {
+                            memcpy(CDC_LineCoding, pEP0_DataBuf, sizeof(CDC_LineCoding));
+                        }
                     }
                 }
                 break;
 
+                // --- 端点1 (键盘) ---
                 case UIS_TOKEN_OUT | 1:
-                {
-                    if(R8_USB_INT_ST & RB_UIS_TOG_OK)
-                    { // 不同步的数据包将丢弃
-                        R8_UEP1_CTRL ^= RB_UEP_R_TOG;
-                        len = R8_USB_RX_LEN;
-                        DevEP1_OUT_Deal(len);
-                    }
-                }
-                break;
-
-                case UIS_TOKEN_IN | 1:
+                    if(R8_USB_INT_ST & RB_UIS_TOG_OK) { R8_UEP1_CTRL ^= RB_UEP_R_TOG; DevEP1_OUT_Deal(R8_USB_RX_LEN); }
+                    break;
+                case UIS_TOKEN_IN  | 1:
+                    // 手动翻转TOG位
                     R8_UEP1_CTRL ^= RB_UEP_T_TOG;
                     R8_UEP1_CTRL = (R8_UEP1_CTRL & ~MASK_UEP_T_RES) | UEP_T_RES_NAK;
                     break;
 
+                // --- 端点2 (SpaceMouse) ---
                 case UIS_TOKEN_OUT | 2:
-                {
-                    if(R8_USB_INT_ST & RB_UIS_TOG_OK)
-                    { // 不同步的数据包将丢弃
-                        R8_UEP2_CTRL ^= RB_UEP_R_TOG;
-                        len = R8_USB_RX_LEN;
-                        DevEP2_OUT_Deal(len);
-                    }
-                }
-                break;
-
-                case UIS_TOKEN_IN | 2:
+                    if(R8_USB_INT_ST & RB_UIS_TOG_OK) { R8_UEP2_CTRL ^= RB_UEP_R_TOG; DevEP2_OUT_Deal(R8_USB_RX_LEN); }
+                    break;
+                case UIS_TOKEN_IN  | 2:
+                    // 手动翻转TOG位
                     R8_UEP2_CTRL ^= RB_UEP_T_TOG;
                     R8_UEP2_CTRL = (R8_UEP2_CTRL & ~MASK_UEP_T_RES) | UEP_T_RES_NAK;
                     break;
 
-                case UIS_TOKEN_OUT | 3:
-                {
-                    if(R8_USB_INT_ST & RB_UIS_TOG_OK)
-                    { // 不同步的数据包将丢弃
-                        R8_UEP3_CTRL ^= RB_UEP_R_TOG;
-                        len = R8_USB_RX_LEN;
-                        DevEP3_OUT_Deal(len);
-                    }
-                }
-                break;
 
+                // --- 端点3 (CDC 数据) ---
+                case UIS_TOKEN_OUT | 3:
+                    if(R8_USB_INT_ST & RB_UIS_TOG_OK)
+                    {
+                        // Bulk端点未开启AUTO_TOG，需手动翻转R_TOG
+                        R8_UEP3_CTRL ^= RB_UEP_R_TOG;
+                        DevEP3_OUT_Deal(R8_USB_RX_LEN);
+                    }
+                    break;
                 case UIS_TOKEN_IN | 3:
-                    R8_UEP3_CTRL ^= RB_UEP_T_TOG;
                     R8_UEP3_CTRL = (R8_UEP3_CTRL & ~MASK_UEP_T_RES) | UEP_T_RES_NAK;
                     break;
 
+                // --- 端点4 (CDC 通知) ---
                 case UIS_TOKEN_OUT | 4:
-                {
                     if(R8_USB_INT_ST & RB_UIS_TOG_OK)
                     {
-                        R8_UEP4_CTRL ^= RB_UEP_R_TOG;
-                        len = R8_USB_RX_LEN;
-                        DevEP4_OUT_Deal(len);
+                        // 硬件已开启AUTO_TOG，软件无需翻转R_TOG
+                        DevEP4_OUT_Deal(R8_USB_RX_LEN);
                     }
-                }
-                break;
-
+                    break;
                 case UIS_TOKEN_IN | 4:
-                    R8_UEP4_CTRL ^= RB_UEP_T_TOG;
                     R8_UEP4_CTRL = (R8_UEP4_CTRL & ~MASK_UEP_T_RES) | UEP_T_RES_NAK;
                     break;
 
@@ -335,6 +303,16 @@ void USB_DevTransProcess(void)
                 {
                     switch(SetupReqCode)
                     {
+                        case CDC_GET_LINE_CODING:
+                            pDescr = CDC_LineCoding;
+                            len = sizeof(CDC_LineCoding);
+                            break;
+                        case CDC_SET_LINE_CODING:
+                            // 接收数据阶段在 UIS_TOKEN_OUT 中处理
+                            break;
+                        case CDC_SET_CONTROL_LINE_STATE:
+                            // 主机通过这个请求来打开/关闭串口，我们只需ACK即可
+                            break;
                         case DEF_USB_SET_IDLE: /* 0x0A: SET_IDLE */
                             Idle_Value = EP0_Databuf[3];
                             break; //这个一定要有
@@ -379,7 +357,7 @@ void USB_DevTransProcess(void)
                             case USB_DESCR_TYP_CONFIG:
                             {
                                 pDescr = MyCfgDescr;
-                                len = MyCfgDescr[2];
+                                len = MyCfgDescr[2] | (MyCfgDescr[3] << 8);
                             }
                             break;
 
@@ -705,29 +683,12 @@ void usb_hid_composite_init(void)
     pEP1_RAM_Addr = EP1_Databuf;
     pEP2_RAM_Addr = EP2_Databuf;
     pEP3_RAM_Addr = EP3_Databuf;
-
     // 调用库函数初始化USB设备
     USB_DeviceInit();
     //第二高优先级，第一高为键盘输入
-    PFIC_SetPriority(USB_IRQn,1);
+    PFIC_SetPriority(USB_IRQn,0);
     // 使能USB中断
     PFIC_EnableIRQ(USB_IRQn);
-}
-
-void usb_hid_composite_report_mouse(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel)
-{
-    // 注意：这个复合设备示例中，鼠标使用的是端点2
-    uint8_t HIDMouse[4];
-    HIDMouse[0] = buttons; // 按键
-    HIDMouse[1] = dx;      // X轴
-    HIDMouse[2] = dy;      // Y轴
-    HIDMouse[3] = wheel;   // 滚轮
-    
-    // 检查端点2是否繁忙，如果繁忙可以等待或返回错误
-    while(R8_UEP2_CTRL & UEP_T_RES_ACK); // 简单的等待方式
-
-    memcpy(pEP2_IN_DataBuf, HIDMouse, sizeof(HIDMouse));
-    DevEP2_IN_Deal(sizeof(HIDMouse));
 }
 
 void usb_hid_report_keyboard(uint8_t modifier, uint8_t key_code)
@@ -771,23 +732,22 @@ void usb_hid_composite_wakeup(void)
 }
 
 /**
- * @brief 发送6轴数据（平移和旋转）- 优化版
- * @note  此版本通过静态变量交替发送平移和旋转报告，
- * 避免在极短时间内连续发送两个报告，提高了USB通信的稳定性。
+ * @brief 发送6轴数据（平移和旋转）
+ * @note  此版本根据当前模式（平移或旋转），发送一个有效的数据报告，
+ * 并紧接着发送一个另一类型的零值报告。
+ * 这可以主动清除PC主机上对应轴的陈旧状态，避免数据残留。
+ * 注意：两次发送之间必须有对端点状态的检查。
  */
 void usb_hid_report_axes(int16_t trans[3], int16_t rot[3])
 {
-    // 使用静态变量来记住下一次应该发送哪个报告
-    static bool send_rotation_next = false;
-    
     uint8_t report_buf[7];
 
-    // 等待端点2就绪 (这是所有报告发送前都必须做的)
-    while((R8_UEP2_CTRL & MASK_UEP_T_RES) != UEP_T_RES_NAK);
-
-    if (send_rotation_next)
+    if (ModeManager_IsRotationMode())
     {
-        // === 这次发送旋转报告 (Report ID = 2) ===
+        // === 旋转模式: 发送有效旋转报告 + 零值平移报告 ===
+
+        // 1. 等待端点就绪，然后发送有效的旋转报告 (Report ID = 2)
+        while((R8_UEP2_CTRL & MASK_UEP_T_RES) != UEP_T_RES_NAK);
         report_buf[0] = 0x02;
         report_buf[1] = rot[0] & 0xFF;
         report_buf[2] = rot[0] >> 8;
@@ -795,13 +755,22 @@ void usb_hid_report_axes(int16_t trans[3], int16_t rot[3])
         report_buf[4] = rot[1] >> 8;
         report_buf[5] = rot[2] & 0xFF;
         report_buf[6] = rot[2] >> 8;
-        
+        memcpy(pEP2_IN_DataBuf, report_buf, 7);
+        DevEP2_IN_Deal(7);
+
+        // 2. 再次等待端点就绪，然后发送零值的平移报告 (Report ID = 1)
+        while((R8_UEP2_CTRL & MASK_UEP_T_RES) != UEP_T_RES_NAK);
+        report_buf[0] = 0x01;
+        memset(&report_buf[1], 0, 6); // 将6个字节的数据位全部清零
         memcpy(pEP2_IN_DataBuf, report_buf, 7);
         DevEP2_IN_Deal(7);
     }
     else
     {
-        // === 这次发送平移报告 (Report ID = 1) ===
+        // === 平移模式: 发送有效平移报告 + 零值旋转报告 ===
+
+        // 1. 等待端点就绪，然后发送有效的平移报告 (Report ID = 1)
+        while((R8_UEP2_CTRL & MASK_UEP_T_RES) != UEP_T_RES_NAK);
         report_buf[0] = 0x01;
         report_buf[1] = trans[0] & 0xFF;
         report_buf[2] = trans[0] >> 8;
@@ -809,14 +778,18 @@ void usb_hid_report_axes(int16_t trans[3], int16_t rot[3])
         report_buf[4] = trans[1] >> 8;
         report_buf[5] = trans[2] & 0xFF;
         report_buf[6] = trans[2] >> 8;
+        memcpy(pEP2_IN_DataBuf, report_buf, 7);
+        DevEP2_IN_Deal(7);
 
+        // 2. 再次等待端点就绪，然后发送零值的旋转报告 (Report ID = 2)
+        while((R8_UEP2_CTRL & MASK_UEP_T_RES) != UEP_T_RES_NAK);
+        report_buf[0] = 0x02;
+        memset(&report_buf[1], 0, 6); // 将6个字节的数据位全部清零
         memcpy(pEP2_IN_DataBuf, report_buf, 7);
         DevEP2_IN_Deal(7);
     }
-
-    // 翻转标志位，让下一次调用发送另一个报告
-    send_rotation_next = !send_rotation_next;
 }
+
 void usb_hid_report_buttons(uint32_t buttons)
 {
     uint8_t report_buf[5];
@@ -870,24 +843,25 @@ void DevEP2_OUT_Deal(uint8_t l)
     //DevEP2_IN_Deal(l);
 }
 
+
 /*********************************************************************
  * @fn      DevEP3_OUT_Deal
- *
- * @brief   端点3数据处理
- *
- * @return  none
- */
+ * @brief   端点3数据处理 (专用于CDC数据接收)
+ *********************************************************************/
 void DevEP3_OUT_Deal(uint8_t l)
-{ /* 用户可自定义 */
-    uint8_t i;
-
-    for(i = 0; i < l; i++)
-    {
-        pEP3_IN_DataBuf[i] = ~pEP3_OUT_DataBuf[i];
+{
+    // 因为包含了 mode_manager.h，现在可以无误地访问这些全局变量
+    if (g_cdc_data_received_flag || l == 0 || l >= CDC_RX_BUF_SIZE) {
+        return;
     }
-    DevEP3_IN_Deal(l);
-}
 
+    // 快速将USB端点缓冲区的数据拷贝到全局缓冲区
+    memcpy(g_cdc_rx_buf, pEP3_OUT_DataBuf, l);
+    g_cdc_rx_len = l;
+
+    // 设置标志位，通知主循环有数据需要处理
+    g_cdc_data_received_flag = true;
+}
 /*********************************************************************
  * @fn      DevEP4_OUT_Deal
  *

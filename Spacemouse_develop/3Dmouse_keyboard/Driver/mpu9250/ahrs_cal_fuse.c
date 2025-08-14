@@ -16,6 +16,18 @@
 #define FIFO_R_W         0x74
 #define MPU9250_ADDRESS  0x68 // 假设 AD0 为低电平
 
+float FastInvSqrt(float x) {
+    float halfx = 0.5f * x;
+    union {
+        float f;
+        uint32_t i;
+    } conv = {x};
+    conv.i = 0x5f3759df - (conv.i >> 1); // 关键的魔术数字
+    conv.f *= (1.5f - (halfx * conv.f * conv.f)); // 牛顿法迭代一次，提高精度
+    // conv.f *= (1.5f - (halfx * conv.f * conv.f)); // 可选：迭代两次以获得更高精度，但会增加耗时
+    return conv.f;
+}
+
 uint8_t ahrs_calibrate_mpu9250(const AhrsPlatformApi* api, float* gyro_bias, float* accel_bias)
 {
     if (api == NULL || api->i2c_write == NULL || api->i2c_read == NULL || api->delay_ms == NULL) {
@@ -142,7 +154,7 @@ void simple_calibrate(uint16_t sample_count, float* gyro_bias_out, float* accel_
             gyro_sum[1] += dps_temp[1];
             gyro_sum[2] += dps_temp[2];
         }
-        mpu9250_interface_delay_ms(10); // 每次读取之间稍作延时，确保获取到新的样本
+        mpu9250_interface_delay_ms(5); // 每次读取之间稍作延时，确保获取到新的样本
     }
 
     // 2. 计算平均值
@@ -153,8 +165,6 @@ void simple_calibrate(uint16_t sample_count, float* gyro_bias_out, float* accel_
     }
 
     // 3. 移除加速度计Z轴的重力分量
-    // 假设设备是水平放置的，Z轴的读数应该是 1g。这个值不是偏置，而是重力。
-    // 真正的偏置是读数与1g之间的差值。
     accel_bias_out[2] = accel_bias_out[2] - 1.0f; 
 
     printf("简易校准完成。\n");
@@ -247,6 +257,100 @@ void ahrs_madgwick_update(MadgwickState* state, float gx, float gy, float gz, fl
     state->q[2] = q3 * norm;
     state->q[3] = q4 * norm;
 }
+
+void ahrs_mahony_update_optimized(MahonyState* state, float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz, float dt)
+{
+    if (state == NULL) return;
+
+    float q1 = state->q[0], q2 = state->q[1], q3 = state->q[2], q4 = state->q[3];
+    float norm;
+    float hx, hy, bx, bz;
+    float vx, vy, vz, wx, wy, wz;
+    float ex, ey, ez;
+    float pa, pb, pc;
+
+    float q1q1 = q1 * q1;
+    float q1q2 = q1 * q2;
+    float q1q3 = q1 * q3;
+    float q1q4 = q1 * q4;
+    float q2q2 = q2 * q2;
+    float q2q3 = q2 * q3;
+    float q2q4 = q2 * q4;
+    float q3q3 = q3 * q3;
+    float q3q4 = q3 * q4;
+    float q4q4 = q4 * q4;
+
+    // --- 优化点 1: 加速度计归一化 ---
+    norm = FastInvSqrt(ax * ax + ay * ay + az * az);
+    if (isinf(norm)) return;
+    ax *= norm;
+    ay *= norm;
+    az *= norm;
+
+    // --- 优化点 2: 磁力计归一化 ---
+    norm = FastInvSqrt(mx * mx + my * my + mz * mz);
+    if (isinf(norm)) return;
+    mx *= norm;
+    my *= norm;
+    mz *= norm;
+
+    hx = 2.0f * mx * (0.5f - q3q3 - q4q4) + 2.0f * my * (q2q3 - q1q4) + 2.0f * mz * (q2q4 + q1q3);
+    hy = 2.0f * mx * (q2q3 + q1q4) + 2.0f * my * (0.5f - q2q2 - q4q4) + 2.0f * mz * (q3q4 - q1q2);
+    
+    // --- 优化点 3: 地磁场水平投影的开方 ---
+    // 原始: bx = sqrtf(hx * hx + hy * hy);
+    norm = hx * hx + hy * hy;
+    if (norm > 0.0f) {
+        bx = norm * FastInvSqrt(norm); // bx = sqrt(norm)
+    } else {
+        bx = 0.0f;
+    }
+    
+    bz = 2.0f * mx * (q2q4 - q1q3) + 2.0f * my * (q3q4 + q1q2) + 2.0f * mz * (0.5f - q2q2 - q3q3);
+
+    vx = 2.0f * (q2q4 - q1q3);
+    vy = 2.0f * (q1q2 + q3q4);
+    vz = q1q1 - q2q2 - q3q3 + q4q4;
+    wx = 2.0f * bx * (0.5f - q3q3 - q4q4) + 2.0f * bz * (q2q4 - q1q3);
+    wy = 2.0f * bx * (q2q3 - q1q4) + 2.0f * bz * (q1q2 + q3q4);
+    wz = 2.0f * bx * (q1q3 + q2q4) + 2.0f * bz * (0.5f - q2q2 - q3q3);
+
+    ex = (ay * vz - az * vy) + (my * wz - mz * wy);
+    ey = (az * vx - ax * vz) + (mz * wx - mx * wz);
+    ez = (ax * vy - ay * vx) + (mx * wy - my * wx);
+    if (state->Ki > 0.0f)
+    {
+        state->eInt[0] += ex;
+        state->eInt[1] += ey;
+        state->eInt[2] += ez;
+    }
+    else
+    {
+        state->eInt[0] = 0.0f;
+        state->eInt[1] = 0.0f;
+        state->eInt[2] = 0.0f;
+    }
+
+    gx = gx + state->Kp * ex + state->Ki * state->eInt[0];
+    gy = gy + state->Kp * ey + state->Ki * state->eInt[1];
+    gz = gz + state->Kp * ez + state->Ki * state->eInt[2];
+
+    pa = q2;
+    pb = q3;
+    pc = q4;
+    q1 = q1 + (-q2 * gx - q3 * gy - q4 * gz) * (0.5f * dt);
+    q2 = pa + (q1 * gx + pb * gz - pc * gy) * (0.5f * dt);
+    q3 = pb + (q1 * gy - pa * gz + pc * gx) * (0.5f * dt);
+    q4 = pc + (q1 * gz + pa * gy - pb * gx) * (0.5f * dt);
+
+    // --- 优化点 4: 最终四元数归一化 ---
+    norm = FastInvSqrt(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4);
+    state->q[0] = q1 * norm;
+    state->q[1] = q2 * norm;
+    state->q[2] = q3 * norm;
+    state->q[3] = q4 * norm;
+}
+
 
 void ahrs_mahony_init(MahonyState* state) {
     if (state == NULL) return;

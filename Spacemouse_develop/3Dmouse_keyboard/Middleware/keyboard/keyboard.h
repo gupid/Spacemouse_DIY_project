@@ -29,4 +29,32 @@ void Keyboard_Init(void);
  */
 bool Keyboard_GetKeyEvent(KeyEvent_t *pEvent);
 
+/**
+ * @brief 将 HSV 颜色模型转换为 RGB 颜色模型
+ * @param h 色相 (0.0f - 360.0f)
+ * @param s 饱和度 (0.0f - 1.0f)
+ * @param v 亮度 (0.0f - 1.0f)
+ * @param r 返回的红色分量指针 (0-255)
+ * @param g 返回的绿色分量指针 (0-255)
+ * @param b 返回的蓝色分量指针 (0-255)
+ */
+void hsv_to_rgb(float h, float s, float v, uint8_t *r, uint8_t *g, uint8_t *b);
+
+/**
+ * @brief 更新并显示一帧彩虹呼吸灯动画。
+ * @note  此函数为非阻塞函数。应在主循环中被反复调用。
+ * 函数内部会检查DMA是否繁忙，若繁忙则直接返回。
+ */
+void WS2812B_RainbowBreathe_Update(void);
+
+/**
+ * @brief 设置“赛博朋克夜色”功能分区静态灯效
+ * @note  此函数会根据 g_led_key_type_map 表为每个LED设置颜色。
+ */
+void Light_Set_FunctionalZoning_Cyberpunk(void);
+
+void keyboard_LED_display();
+void change_LED_display_mode();
+
+
 #endif // __KEYBOARD_H

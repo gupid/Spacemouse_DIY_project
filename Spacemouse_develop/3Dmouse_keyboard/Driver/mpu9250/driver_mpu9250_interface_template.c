@@ -45,7 +45,7 @@
  */
 uint8_t mpu9250_interface_iic_init(void)
 {
-    WA_I2C_Init(&wai2c0,GPIOB,GPIO_Pin_5,GPIOB,GPIO_Pin_4,1);
+    WA_I2C_Init(&wai2c0,GPIOB,GPIO_Pin_4,GPIOB,GPIO_Pin_5,1);
     return 0;
 }
 

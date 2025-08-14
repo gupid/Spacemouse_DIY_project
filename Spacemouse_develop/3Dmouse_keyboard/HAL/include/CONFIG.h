@@ -126,13 +126,13 @@
 #define BLE_MEMHEAP_SIZE                    (1024*6)
 #endif
 #ifndef BLE_BUFF_MAX_LEN
-#define BLE_BUFF_MAX_LEN                    27
+#define BLE_BUFF_MAX_LEN                    251
 #endif
 #ifndef BLE_BUFF_NUM
-#define BLE_BUFF_NUM                        5
+#define BLE_BUFF_NUM                        10
 #endif
 #ifndef BLE_TX_NUM_EVENT
-#define BLE_TX_NUM_EVENT                    1
+#define BLE_TX_NUM_EVENT                    5
 #endif
 #ifndef BLE_TX_POWER
 #define BLE_TX_POWER                        LL_TX_POWEER_0_DBM

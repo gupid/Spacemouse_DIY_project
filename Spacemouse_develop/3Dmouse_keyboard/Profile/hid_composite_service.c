@@ -84,76 +84,113 @@ static const uint8_t hidInfo[HID_INFORMATION_LEN] = {
     HID_FEATURE_FLAGS                     // Flags
 };
 
-// HID Report Map characteristic value
+// hid_composite_service.c
+
+// HID Report Map characteristic value (Corrected and Aligned with USB Version)
 static const uint8_t hidReportMap[] = {
-    // --- 键盘部分 ---
-    0x05, 0x01,       // Usage Pg (Generic Desktop)
-    0x09, 0x06,       // Usage (Keyboard)
-    0xA1, 0x01,       // Collection: (Application)
-    0x85, 0x01,       //   Report ID (1)  <--  指定键盘报告ID为1
-    // Modifier byte
-    0x05, 0x07,       //   Usage Pg (Key Codes)
-    0x19, 0xE0,       //   Usage Min (224)
-    0x29, 0xE7,       //   Usage Max (231)
-    0x15, 0x00,       //   Log Min (0)
-    0x25, 0x01,       //   Log Max (1)
-    0x75, 0x01,       //   Report Size (1)
-    0x95, 0x08,       //   Report Count (8)
-    0x81, 0x02,       //   Input: (Data, Variable, Absolute)
-    // Reserved byte
-    0x95, 0x01,       //   Report Count (1)
-    0x75, 0x08,       //   Report Size (8)
-    0x81, 0x01,       //   Input: (Constant)
-    // Key arrays (6 bytes)
-    0x95, 0x06,       //   Report Count (6)
-    0x75, 0x08,       //   Report Size (8)
-    0x15, 0x00,       //   Log Min (0)
-    0x25, 0x65,       //   Log Max (101)
-    0x05, 0x07,       //   Usage Pg (Key Codes)
-    0x19, 0x00,       //   Usage Min (0)
-    0x29, 0x65,       //   Usage Max (101)
-    0x81, 0x00,       //   Input: (Data, Array)
-    // LED report (Output)
-    0x85, 0x01,       //   Report ID (1) <-- 同样属于键盘
-    0x95, 0x05,       //   Report Count (5)
-    0x75, 0x01,       //   Report Size (1)
-    0x05, 0x08,       //   Usage Pg (LEDs)
-    0x19, 0x01,       //   Usage Min (1)
-    0x29, 0x05,       //   Usage Max (5)
-    0x91, 0x02,       //   Output: (Data, Variable, Absolute)
-    // LED report padding
-    0x95, 0x01,       //   Report Count (1)
-    0x75, 0x03,       //   Report Size (3)
-    0x91, 0x01,       //   Output: (Constant)
-    0xC0,             // End Collection
-// --- SpaceMouse 部分 (结构优化) ---
+    // --- TLC 1: SpaceMouse ---
     0x05, 0x01,       // Usage Page (Generic Desktop)
     0x09, 0x08,       // Usage (Multi-Axis Controller)
     0xA1, 0x01,       // Collection (Application)
-        // --- 全局属性 (对后续所有轴生效) ---
-        0x16, 0xA2, 0xFE, // Logical Minimum (-350)
-        0x26, 0x5E, 0x01, // Logical Maximum (350)
-        0x75, 0x10,       // Report Size (16 bits)
-        0x95, 0x03,       // Report Count (3 axes)
+        // 报告ID 1: 平移
+        0x85, 0x01,       //   Report ID (1)
+        0x09, 0x30,       //   Usage (X)
+        0x09, 0x31,       //   Usage (Y)
+        0x09, 0x32,       //   Usage (Z)
+        0x16, 0xA2, 0xFE, //   Logical Minimum (-350)
+        0x26, 0x5E, 0x01, //   Logical Maximum (350)
+        0x75, 0x10,       //   Report Size (16)
+        0x95, 0x03,       //   Report Count (3)
+        0x81, 0x02,       //   Input (Data, Var, Abs)
+        // 报告ID 2: 旋转
+        0x85, 0x02,       //   Report ID (2)
+        0x09, 0x33,       //   Usage (Rx)
+        0x09, 0x34,       //   Usage (Ry)
+        0x09, 0x35,       //   Usage (Rz)
+        0x16, 0xA2, 0xFE, //   Logical Minimum (-350)
+        0x26, 0x5E, 0x01, //   Logical Maximum (350)
+        0x75, 0x10,       //   Report Size (16)
+        0x95, 0x03,       //   Report Count (3)
+        0x81, 0x02,       //   Input (Data, Var, Abs)
+        // 报告ID 3: 按键
+        0x85, 0x03,       //   Report ID (3)
+        0x05, 0x09,       //   Usage Page (Button)
+        0x19, 0x01,       //   Usage Minimum (Button 1)
+        0x29, 0x20,       //   Usage Maximum (Button 32)
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x25, 0x01,       //   Logical Maximum (1)
+        0x75, 0x01,       //   Report Size (1)
+        0x95, 0x20,       //   Report Count (32)
+        0x81, 0x02,       //   Input (Data, Var, Abs)
+        // 报告ID 4: LED
+        0x85, 0x04,       //   Report ID (4)
+        0x05, 0x08,       //   Usage Page (LEDs)
+        0x09, 0x4B,       //   Usage (Generic Indicator)
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x25, 0x01,       //   Logical Maximum (1)
+        0x75, 0x01,       //   Report Size (1)
+        0x95, 0x01,       //   Report Count (1)
+        0x91, 0x02,       //   Output (Data, Var, Abs)
+        0x75, 0x07,       //   Report Size (7) - Padding
+        0x95, 0x01,       //   Report Count (1)
+        0x91, 0x03,       //   Output (Constant)
+    0xC0,             // End Collection (SpaceMouse)
 
-        // --- 平移报告 (Translation) ---
-        0x85, 0x02,       // Report ID (2)
-        0xA1, 0x00,       // Collection (Physical)  <-- **新增：开启物理集合**
-            0x09, 0x30,   //   Usage (X)
-            0x09, 0x31,   //   Usage (Y)
-            0x09, 0x32,   //   Usage (Z)
-            0x81, 0x02,   //   Input (Data, Variable, Absolute)
-        0xC0,             // End Collection         <-- **新增：关闭物理集合**
+    // --- TLC 2: Keyboard ---
+    0x05, 0x01,       // Usage Page (Generic Desktop)
+    0x09, 0x06,       // Usage (Keyboard)
+    0xA1, 0x01,       // Collection (Application)
+        // 报告ID 5: 键盘输入/输出
+        0x85, 0x05,       //   Report ID (5)
+        // Modifier keys (Input)
+        0x05, 0x07,       //   Usage Page (Key Codes)
+        0x19, 0xE0,       //   Usage Minimum (LeftControl)
+        0x29, 0xE7,       //   Usage Maximum (RightGUI)
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x25, 0x01,       //   Logical Maximum (1)
+        0x75, 0x01,       //   Report Size (1)
+        0x95, 0x08,       //   Report Count (8)
+        0x81, 0x02,       //   Input (Data, Var, Abs)
+        // Reserved byte (Input)
+        0x95, 0x01,       //   Report Count (1)
+        0x75, 0x08,       //   Report Size (8)
+        0x81, 0x01,       //   Input (Constant)
+        // Key array (Input)
+        0x95, 0x06,       //   Report Count (6)
+        0x75, 0x08,       //   Report Size (8)
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x25, 0x65,       //   Logical Maximum (101)
+        0x05, 0x07,       //   Usage Page (Key Codes)
+        0x19, 0x00,       //   Usage Minimum (Reserved)
+        0x29, 0x65,       //   Usage Maximum (Keyboard Application)
+        0x81, 0x00,       //   Input (Data, Array)
+        // LED (Output)
+        0x05, 0x08,       //   Usage Page (LEDs)
+        0x19, 0x01,       //   Usage Minimum (Num Lock)
+        0x29, 0x05,       //   Usage Maximum (Kana)
+        0x95, 0x05,       //   Report Count (5)
+        0x75, 0x01,       //   Report Size (1)
+        0x91, 0x02,       //   Output (Data, Var, Abs)
+        // LED padding (Output)
+        0x95, 0x01,       //   Report Count (1)
+        0x75, 0x03,       //   Report Size (3)
+        0x91, 0x03,       //   Output (Constant)
+    0xC0,             // End Collection (Keyboard)
 
-        // --- 旋转报告 (Rotation) ---
-        0x85, 0x03,       // Report ID (3)
-        0xA1, 0x00,       // Collection (Physical)  <-- **新增：开启物理集合**
-            0x09, 0x33,   //   Usage (RX)
-            0x09, 0x34,   //   Usage (RY)
-            0x09, 0x35,   //   Usage (RZ)
-            0x81, 0x02,   //   Input (Data, Variable, Absolute)
-        0xC0,             // End Collection         <-- **新增：关闭物理集合**
-    0xC0                // End Collection (Application)
+    // --- TLC 3: Feature Report (可以保持独立或合并) ---
+    // 这个报告比较特殊，可以单独存在
+    0x05, 0x01,       // Usage Page (Generic Desktop)
+    0x09, 0x00,       // Usage (Undefined)
+    0xA1, 0x01,       // Collection (Application)
+        // 报告ID 6: Feature 报告
+        0x85, 0x06,       // Report ID (6)
+        0x09, 0x01,       // Usage (Pointer)
+        0x15, 0x00,       // Logical Minimum (0)
+        0x26, 0xFF, 0x00, // Logical Maximum (255)
+        0x75, 0x08,       // Report Size (8)
+        0x95, 0x01,       // Report Count (1)
+        0xB1, 0x02,       // Feature (Data,Var,Abs)
+    0xC0              // End Collection
 };
 
 // HID report map length
@@ -224,20 +261,32 @@ static uint8_t hidReportFeature;
 static uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] =
     {HID_RPT_ID_FEATURE, HID_REPORT_TYPE_FEATURE};
 
-// ---SpaceMouse平移报告 (ID改为2)---
+// ---SpaceMouse平移报告 (ID: 2)---
 static uint8_t       hidReportSpaceTransInProps = GATT_PROP_READ | GATT_PROP_NOTIFY;
 static uint8_t       hidReportSpaceTransIn;
 static gattCharCfg_t hidReportSpaceTransInClientCharCfg[GATT_MAX_NUM_CONN];
 // 定义平移报告ID为2，类型为输入
-static uint8_t hidReportRefSpaceTransIn[HID_REPORT_REF_LEN] = { 0x02, HID_REPORT_TYPE_INPUT };
+static uint8_t hidReportRefSpaceTransIn[HID_REPORT_REF_LEN] = { HID_RPT_ID_SPACE_TRANS_IN, HID_REPORT_TYPE_INPUT };
 
-// ---SpaceMouse旋转报告 (ID改为3)---
+// ---SpaceMouse旋转报告 (ID: 3)---
 static uint8_t       hidReportSpaceRotInProps = GATT_PROP_READ | GATT_PROP_NOTIFY;
 static uint8_t       hidReportSpaceRotIn;
 static gattCharCfg_t hidReportSpaceRotInClientCharCfg[GATT_MAX_NUM_CONN];
 // 定义旋转报告ID为3，类型为输入
-static uint8_t hidReportRefSpaceRotIn[HID_REPORT_REF_LEN] = { 0x03, HID_REPORT_TYPE_INPUT };
+static uint8_t hidReportRefSpaceRotIn[HID_REPORT_REF_LEN] = { HID_RPT_ID_SPACE_ROT_IN, HID_REPORT_TYPE_INPUT };
 
+// --- SpaceMouse按键报告 (ID: 4) ---
+static uint8_t       hidReportSpaceBtnInProps = GATT_PROP_READ | GATT_PROP_NOTIFY;
+static uint8_t       hidReportSpaceBtnIn;
+static gattCharCfg_t hidReportSpaceBtnInClientCharCfg[GATT_MAX_NUM_CONN];
+// 定义按键报告ID为4，类型为输入
+static uint8_t hidReportRefSpaceBtnIn[HID_REPORT_REF_LEN] = { HID_RPT_ID_SPACE_BTN_IN, HID_REPORT_TYPE_INPUT };
+
+// --- SpaceMouse LED输出报告 (ID: 5) ---
+static uint8_t hidReportSpaceLedOutProps = GATT_PROP_READ | GATT_PROP_WRITE | GATT_PROP_WRITE_NO_RSP;
+static uint8_t hidReportSpaceLedOut;
+// 定义LED报告ID为5，类型为输出
+static uint8_t hidReportRefSpaceLedOut[HID_REPORT_REF_LEN] = { HID_RPT_ID_SPACE_LED_OUT, HID_REPORT_TYPE_OUTPUT };
 /*********************************************************************
  * Profile Attributes - Table
  */
@@ -437,6 +486,62 @@ static gattAttribute_t hidAttrTbl[] = {
         hidReportRefSpaceRotIn
     },
 
+    // --- [!!] 新增：HID Report characteristic, SpaceMouse button input declaration ---
+    {
+        {ATT_BT_UUID_SIZE, characterUUID},
+        GATT_PERMIT_READ,
+        0,
+        &hidReportSpaceBtnInProps
+    },
+
+    // --- [!!] 新增：HID Report characteristic, SpaceMouse button input ---
+    {
+        {ATT_BT_UUID_SIZE, hidReportUUID}, // 使用通用报告UUID
+        GATT_PERMIT_ENCRYPT_READ,
+        0,
+        &hidReportSpaceBtnIn
+    },
+
+    // --- [!!] 新增：HID Report characteristic client characteristic configuration (CCCD) ---
+    {
+        {ATT_BT_UUID_SIZE, clientCharCfgUUID},
+        GATT_PERMIT_READ | GATT_PERMIT_ENCRYPT_WRITE,
+        0,
+        (uint8_t *)&hidReportSpaceBtnInClientCharCfg
+    },
+
+    // --- [!!] 新增：HID Report Reference characteristic descriptor, SpaceMouse button input ---
+    {
+        {ATT_BT_UUID_SIZE, reportRefUUID},
+        GATT_PERMIT_READ,
+        0,
+        hidReportRefSpaceBtnIn
+    },
+
+    // --- [!!] 新增：HID Report characteristic, SpaceMouse LED output declaration ---
+    {
+        {ATT_BT_UUID_SIZE, characterUUID},
+        GATT_PERMIT_READ,
+        0,
+        &hidReportSpaceLedOutProps
+    },
+
+    // --- [!!] 新增：HID Report characteristic, SpaceMouse LED output ---
+    {
+        {ATT_BT_UUID_SIZE, hidReportUUID}, // 使用通用报告UUID
+        GATT_PERMIT_ENCRYPT_READ | GATT_PERMIT_ENCRYPT_WRITE,
+        0,
+        &hidReportSpaceLedOut
+    },
+        
+    // --- [!!] 新增：HID Report Reference characteristic descriptor, SpaceMouse LED output ---
+    {
+        {ATT_BT_UUID_SIZE, reportRefUUID},
+        GATT_PERMIT_READ,
+        0,
+        hidReportRefSpaceLedOut
+    },
+    
     // HID Boot Keyboard Input Report declaration
     {
         {ATT_BT_UUID_SIZE, characterUUID},
@@ -527,6 +632,14 @@ enum
     HID_REPORT_SPACEROT_IN_IDX,
     HID_REPORT_SPACEROT_IN_CCCD_IDX,
     HID_REPORT_REF_SPACEROT_IN_IDX,
+    // --- [!!] 新增：SpaceMouse按键和LED的索引 ---
+    HID_REPORT_SPACEBTN_IN_DECL_IDX,
+    HID_REPORT_SPACEBTN_IN_IDX,
+    HID_REPORT_SPACEBTN_IN_CCCD_IDX,
+    HID_REPORT_REF_SPACEBTN_IN_IDX,
+    HID_REPORT_SPACELED_OUT_DECL_IDX,
+    HID_REPORT_SPACELED_OUT_IDX,
+    HID_REPORT_REF_SPACELED_OUT_IDX,
 
     // --- 启动模式相关 ---
     HID_BOOT_KEY_IN_DECL_IDX,
@@ -573,11 +686,12 @@ bStatus_t HidComposite_AddService(void)
     uint8_t status = SUCCESS;
 
     // 1. 初始化客户端特性配置 (Client Characteristic Configuration)
-    //    这里已经正确地移除了鼠标的初始化，保留了键盘和SpaceMouse的
+    //    [!!] 新增SpaceMouse按键的CCCD初始化
     GATTServApp_InitCharCfg(INVALID_CONNHANDLE, hidReportKeyInClientCharCfg);
     GATTServApp_InitCharCfg(INVALID_CONNHANDLE, hidReportBootKeyInClientCharCfg);
     GATTServApp_InitCharCfg(INVALID_CONNHANDLE, hidReportSpaceTransInClientCharCfg);
     GATTServApp_InitCharCfg(INVALID_CONNHANDLE, hidReportSpaceRotInClientCharCfg);
+    GATTServApp_InitCharCfg(INVALID_CONNHANDLE, hidReportSpaceBtnInClientCharCfg); // <-- 新增
 
     // 2. 注册GATT属性表
     status = GATTServApp_RegisterService(hidAttrTbl, GATT_NUM_ATTRS(hidAttrTbl), GATT_MAX_ENCRYPT_KEY_SIZE, &hidKbdCBs);
@@ -586,72 +700,81 @@ bStatus_t HidComposite_AddService(void)
         return status;
     }
 
-    // 3. 设置包含的电池服务
+    // 3. 设置包含的电池服务 (保持不变)
     Batt_GetParameter(BATT_PARAM_SERVICE_HANDLE,
                       &GATT_INCLUDED_HANDLE(hidAttrTbl, HID_INCLUDED_SERVICE_IDX));
 
     // 4. --- 核心修正：重建报告ID和GATT句柄的映射表 ---
-    //    这个表告诉协议栈哪个报告ID对应哪个GATT服务句柄。
-    //    顺序和内容必须与hidReportMap以及hidAttrTbl完全一致。
-
-    // 报告 0: 键盘输入 (Report ID: 1)
+    //    总报告数现在是10个
+    
+    // 报告 0-5 (保持不变)
+    // ... (键盘、LED、启动模式、Feature、电池) ...
     hidRptMap[0].id = hidReportRefKeyIn[0];
     hidRptMap[0].type = hidReportRefKeyIn[1];
     hidRptMap[0].handle = hidAttrTbl[HID_REPORT_KEY_IN_IDX].handle;
     hidRptMap[0].cccdHandle = hidAttrTbl[HID_REPORT_KEY_IN_CCCD_IDX].handle;
     hidRptMap[0].mode = HID_PROTOCOL_MODE_REPORT;
 
-    // 报告 1: LED 输出 (Report ID: 1)
     hidRptMap[1].id = hidReportRefLedOut[0];
     hidRptMap[1].type = hidReportRefLedOut[1];
     hidRptMap[1].handle = hidAttrTbl[HID_REPORT_LED_OUT_IDX].handle;
     hidRptMap[1].cccdHandle = 0;
     hidRptMap[1].mode = HID_PROTOCOL_MODE_REPORT;
 
-    // 报告 2: 启动模式 - 键盘输入 (Report ID: 1)
     hidRptMap[2].id = hidReportRefKeyIn[0];
     hidRptMap[2].type = hidReportRefKeyIn[1];
     hidRptMap[2].handle = hidAttrTbl[HID_BOOT_KEY_IN_IDX].handle;
     hidRptMap[2].cccdHandle = hidAttrTbl[HID_BOOT_KEY_IN_CCCD_IDX].handle;
     hidRptMap[2].mode = HID_PROTOCOL_MODE_BOOT;
 
-    // 报告 3: 启动模式 - LED 输出 (Report ID: 1)
     hidRptMap[3].id = hidReportRefLedOut[0];
     hidRptMap[3].type = hidReportRefLedOut[1];
     hidRptMap[3].handle = hidAttrTbl[HID_BOOT_KEY_OUT_IDX].handle;
     hidRptMap[3].cccdHandle = 0;
     hidRptMap[3].mode = HID_PROTOCOL_MODE_BOOT;
 
-    // 报告 4: Feature 报告 (Report ID: 4)
     hidRptMap[4].id = hidReportRefFeature[0];
     hidRptMap[4].type = hidReportRefFeature[1];
     hidRptMap[4].handle = hidAttrTbl[HID_FEATURE_IDX].handle;
     hidRptMap[4].cccdHandle = 0;
     hidRptMap[4].mode = HID_PROTOCOL_MODE_REPORT;
 
-    // 报告 5: 电池电量 (由电池服务内部定义ID)
     Batt_GetParameter(BATT_PARAM_BATT_LEVEL_IN_REPORT, &(hidRptMap[5]));
 
     // 报告 6: SpaceMouse 平移报告 (Report ID: 2)
-    hidRptMap[6].id = hidReportRefSpaceTransIn[0]; // ID = 2
+    hidRptMap[6].id = hidReportRefSpaceTransIn[0];
     hidRptMap[6].type = hidReportRefSpaceTransIn[1];
     hidRptMap[6].handle = hidAttrTbl[HID_REPORT_SPACETRANS_IN_IDX].handle;
     hidRptMap[6].cccdHandle = hidAttrTbl[HID_REPORT_SPACETRANS_IN_CCCD_IDX].handle;
     hidRptMap[6].mode = HID_PROTOCOL_MODE_REPORT;
 
     // 报告 7: SpaceMouse 旋转报告 (Report ID: 3)
-    hidRptMap[7].id = hidReportRefSpaceRotIn[0]; // ID = 3
+    hidRptMap[7].id = hidReportRefSpaceRotIn[0];
     hidRptMap[7].type = hidReportRefSpaceRotIn[1];
     hidRptMap[7].handle = hidAttrTbl[HID_REPORT_SPACEROT_IN_IDX].handle;
     hidRptMap[7].cccdHandle = hidAttrTbl[HID_REPORT_SPACEROT_IN_CCCD_IDX].handle;
     hidRptMap[7].mode = HID_PROTOCOL_MODE_REPORT;
 
-    // 5. 注册所有报告 (总共8个)
+    // --- [!!] 新增：注册SpaceMouse按键和LED报告的映射 ---
+    // 报告 8: SpaceMouse 按键报告 (Report ID: 4)
+    hidRptMap[8].id = hidReportRefSpaceBtnIn[0];
+    hidRptMap[8].type = hidReportRefSpaceBtnIn[1];
+    hidRptMap[8].handle = hidAttrTbl[HID_REPORT_SPACEBTN_IN_IDX].handle;
+    hidRptMap[8].cccdHandle = hidAttrTbl[HID_REPORT_SPACEBTN_IN_CCCD_IDX].handle;
+    hidRptMap[8].mode = HID_PROTOCOL_MODE_REPORT;
+
+    // 报告 9: SpaceMouse LED 输出报告 (Report ID: 5)
+    hidRptMap[9].id = hidReportRefSpaceLedOut[0];
+    hidRptMap[9].type = hidReportRefSpaceLedOut[1];
+    hidRptMap[9].handle = hidAttrTbl[HID_REPORT_SPACELED_OUT_IDX].handle;
+    hidRptMap[9].cccdHandle = 0; // 输出报告没有CCCD
+    hidRptMap[9].mode = HID_PROTOCOL_MODE_REPORT;
+
+    // 5. 注册所有报告 ([!!] 数量改为HID_NUM_REPORTS)
     HidDev_RegisterReports(HID_NUM_REPORTS, hidRptMap);
 
     return (status);
 }
-
 /*********************************************************************
  * @fn      Hid_SetParameter
  *

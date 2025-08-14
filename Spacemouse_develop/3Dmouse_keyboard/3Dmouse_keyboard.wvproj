@@ -43,7 +43,8 @@
 				"post_script_description": "",
 				"excludeResources": [
 					"${project}/Profile/hidmouseservice.c",
-					"${project}/Profile/include/hidmouseservice.h"
+					"${project}/Profile/include/hidmouseservice.h",
+					"${project}/Middleware/RF_middleware/RF_PHY.h"
 				],
 				"optimization": {
 					"level": "size",

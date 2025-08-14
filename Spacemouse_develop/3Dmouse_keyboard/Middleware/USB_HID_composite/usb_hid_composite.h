@@ -36,7 +36,6 @@ void usb_hid_send_report(const uint8_t* report);
  * @brief 设备模式唤醒主机
  */
 void usb_hid_composite_wakeup(void);
-
 void usb_hid_report_axes(int16_t trans[3], int16_t rot[3]);
 void usb_hid_report_buttons(uint32_t buttons);
 
