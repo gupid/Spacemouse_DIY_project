@@ -2,13 +2,15 @@
 
 这是一个开源的 DIY 3D 鼠标 (Spacemouse) 工程。它基于沁恒(WCH)的 CH585 系列微控制器，旨在为 3D 设计、建模和工程人员提供一个高性价比的 3D 控制器解决方案。该设备集成了 3D 鼠标、普通鼠标和键盘功能，并支持有线、蓝牙(BLE)和私有 2.4G RF 连接。
 
-## 硬件概述
+## 硬件概述与驱动
 
 主控为CH585，接收器为CH582F，键盘扫描芯片为CH450，均为沁恒产品。陀螺仪使用MPU9250。
 
 接收器的电路设计借鉴了开源工程[CH582F接收器 - 立创开源硬件平台](https://oshwhub.com/bakacai/ch582f-jie-shou-qi)
 
 主板和键盘PCB为自己设计。
+
+驱动版本：[3Dconnexion 10.7.1](https://3dconnexion.com/cn/driver-download/)
 
 ## 主要功能
 
